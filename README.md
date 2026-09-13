@@ -68,7 +68,16 @@ Kontrakten beskriver formen på loggen, ikke alle appens mulige hendelser eller 
 4. Test med appens encoder, reell asynkron trace-kontekst og syntetiske data. Test også en vellykket fallback eller cancellation der det er relevant.
 5. Innfør resten gradvis. Ikke endre domenefeil eller logg alle forventede utfall bare for å fylle dashboardet.
 
-Pakkene klargjøres for GitHub Packages. Før første innføring må første versjon være publisert og lesetilgang fra konsumerende repo verifisert. Ikke legg inn en avhengighet på en versjon som ennå ikke finnes. Se [releaseveiledningen](.github/RELEASING.md).
+Alle fire pakker er publisert som **0.1.0** i GitHub Packages. De bruker fortsatt runtime-error-kontrakt v1.0.0. Start med en pinnet pakkeversjon, og verifiser pakketilgang i appens CI før merge.
+
+For Node/Next med eksisterende GitHub Packages-oppsett:
+
+```sh
+pnpm add --save-exact @navikt/esyfo-logger@0.1.0
+pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.1.0
+```
+
+For JVM, se [avhengigheter og registryoppsett](jvm/README.md#avhengigheter-og-verifisering). GitHub Packages krever lesetilgang også for offentlige pakker. Bruk appens vanlige registry-autentisering; biblioteket trenger ingen produksjonssecrets. Se [releaseveiledningen](.github/RELEASING.md) for senere utgivelser.
 
 ## Utvikling og verifisering
 

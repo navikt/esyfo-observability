@@ -104,8 +104,22 @@ En syntetisk MDC-test beviser ikke at NAIS-agenten sporer hele produksjonsforlø
 
 ## Avhengigheter og verifisering
 
-Artefaktene heter `no.nav.esyfo.observability:esyfo-logger:0.1.0` og
-`no.nav.esyfo.observability:esyfo-logger-testkit:0.1.0`. Publiseringsstatus står i rot-README.
+Versjon 0.1.0 er publisert i GitHub Packages. Bruk appens eksisterende
+registryoppsett, med `https://maven.pkg.github.com/navikt/esyfo-observability`
+som repository for gruppen `no.nav.esyfo.observability`:
+
+```kotlin
+dependencies {
+    implementation("no.nav.esyfo.observability:esyfo-logger:0.1.0")
+    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.1.0")
+}
+```
+
+Begrens repositoryet til denne gruppen med Gradles `exclusiveContent`.
+Bruk eksisterende GitHub Packages-autentisering ved bygg, og kontroller
+`packages: read` i alle CI-jobber som løser avhengighetene, også kodeanalyse.
+Ingen registry-credentials skal sjekkes inn eller følge med appen til produksjon.
+
 Runtime har bare Kotlin/SLF4J-avhengigheter. Testkit er en testavhengighet og bruker
 networknt/Jackson internt; ingen Jackson-typer finnes i det offentlige API-et.
 Logback/Logstash kommer fra appen. Testprofilen bruker Logback 1.6.3 og Logstash 9.0.
