@@ -10,7 +10,8 @@ export async function checkUnpublished(version, token, actor, request = fetch) {
   for (const artifact of ['esyfo-logger', 'esyfo-logger-testkit']) {
     const checks = [
       {
-        url: `https://npm.pkg.github.com/@navikt%2F${artifact}/${version}`,
+        url: `https://npm.pkg.github.com/@navikt%2F${artifact}`,
+        npmPackage: `@navikt/${artifact}`,
         authorization: `Bearer ${token}`,
       },
       {
@@ -18,12 +19,27 @@ export async function checkUnpublished(version, token, actor, request = fetch) {
         authorization: `Basic ${Buffer.from(`${actor}:${token}`).toString('base64')}`,
       },
     ];
-    for (const { url, authorization } of checks) {
+    for (const { url, npmPackage, authorization } of checks) {
       const response = await request(url, {
         headers: { authorization },
         redirect: 'error',
         signal: AbortSignal.timeout(10_000),
       });
+      if (npmPackage && response.status === 200) {
+        const metadata = await response.json().catch(() => {
+          throw new Error(`Refusing to publish: ${url} returned invalid npm metadata`);
+        });
+        assert.ok(
+          metadata?.name === npmPackage && metadata.versions !== null &&
+          typeof metadata.versions === 'object' && !Array.isArray(metadata.versions),
+          `Refusing to publish: ${url} returned unexpected npm metadata`,
+        );
+        assert.ok(
+          !Object.hasOwn(metadata.versions, version),
+          `Refusing to publish: ${npmPackage}@${version} already exists`,
+        );
+        continue;
+      }
       await response.body?.cancel();
       assert.equal(
         response.status,
@@ -40,5 +56,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     process.env.GITHUB_TOKEN,
     process.env.GITHUB_ACTOR,
   );
-  console.log('All four registry version checks returned 404; no existing versions will be overwritten.');
+  console.log('All four package versions are absent; no existing versions will be overwritten.');
 }

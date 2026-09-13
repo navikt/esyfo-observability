@@ -39,8 +39,11 @@ uten registry-token. Det samme gjelder release-verifiseringen.
 - Maven-publication til et lokalt repository bevarer JAR, sources, POM og
   Gradle metadata byte for byte. Publiseringsbygget har ingen compiler eller
   kildekodeavhengighet.
-- Alle fire registry-oppslag må returnere 404 før første publiseringsforsøk.
-  Auth-feil, rate-limit og andre ukjente svar stopper publisering.
+- Npm sjekkes gjennom pakkens metadata-endepunkt: enten finnes ikke pakken
+  (404), eller et gyldig svar (200) for riktig pakke har en `versions`-oversikt
+  uten den aktuelle versjonen. Maven krever 404 for den aktuelle POM-filen.
+  Eksisterende versjoner, ugyldige metadata, auth-feil, rate-limit og andre
+  ukjente svar stopper publisering.
 
 Npm publiserer de testede tarballene med lifecycle scripts avslått. Maven
 publiserer de testede filene fra staging-repositoryet. Ingen pakke bygges på
