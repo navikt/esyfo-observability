@@ -1,0 +1,9 @@
+<configuration>
+    <property name="applicationName" value="packaged-consumer"/>
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"application":"${applicationName}"}</customFields>
+        </encoder>
+    </appender>
+    <root level="INFO"><appender-ref ref="JSON"/></root>
+</configuration>

@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+
+minimumReleaseAge: 1440
+strictDepBuilds: true
+autoInstallPeers: false
+
+allowBuilds:
+  esbuild: true

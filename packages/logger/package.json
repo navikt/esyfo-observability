@@ -1,0 +1,48 @@
+{
+  "name": "@navikt/esyfo-logger",
+  "version": "0.1.0",
+  "description": "Typed application events for an existing structured logger",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navikt/esyfo-observability.git",
+    "directory": "packages/logger"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node scripts/cjs-package.mjs",
+    "test": "vitest run tests",
+    "typecheck": "tsc -p tsconfig.type-tests.json"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "pino": "10.3.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

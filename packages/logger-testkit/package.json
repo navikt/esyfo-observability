@@ -1,0 +1,33 @@
+{
+  "name": "@navikt/esyfo-logger-testkit",
+  "version": "0.1.0",
+  "description": "Assertions for actual serialized application logs",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": { "node": ">=24" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+  },
+  "files": ["dist", "contracts", "README.md", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navikt/esyfo-observability.git",
+    "directory": "packages/logger-testkit"
+  },
+  "publishConfig": { "registry": "https://npm.pkg.github.com" },
+  "scripts": {
+    "prepare:contracts": "node scripts/prepare-contracts.mjs",
+    "build": "pnpm prepare:contracts && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "pnpm prepare:contracts && vitest run"
+  },
+  "dependencies": { "ajv": "8.20.0", "jsonc-parser": "3.3.1" },
+  "devDependencies": {
+    "@navikt/esyfo-logger": "workspace:^",
+    "@types/node": "24.13.3",
+    "pino": "10.3.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

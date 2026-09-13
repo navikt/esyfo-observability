@@ -1,0 +1,17 @@
+[
+  {"name":"pino-error","valid":true,"json":"{\"event_type\":\"plan_fetch_failed\",\"level\":50,\"msg\":\"Kunne ikke hente plan\",\"error_code\":\"NETWORK_ERROR\"}"},
+  {"name":"logback-error","valid":true,"json":"{\"event_type\":\"plan_fetch_failed\",\"level\":\"ERROR\",\"message\":\"Kunne ikke hente plan\",\"upstream_status\":503}"},
+  {"name":"rejection","valid":true,"json":"{\"event_type\":\"api_request_rejected\",\"level\":\"WARN\",\"message\":\"Forespørselen ble avvist\",\"operation\":\"fetch_plan\",\"rejection_reason\":\"ACCESS_DENIED\"}"},
+  {"name":"pdl-diagnostics","valid":true,"json":"{\"event_type\":\"pdl_lookup_failed\",\"message\":\"PDL-oppslaget feilet\",\"pdl_errors\":[{\"message\":\"Technical upstream error\",\"extensions\":{\"code\":\"server_error\"}}]}"},
+  {"name":"trace","valid":true,"json":"{\"event_type\":\"plan_fetch_failed\",\"trace_id\":\"1234567890abcdef1234567890abcdef\"}"},
+  {"name":"shape-only-no-severity-policy","valid":true,"json":"{\"event_type\":\"plan_not_found\",\"level\":\"INFO\"}"},
+  {"name":"missing-event","valid":false,"json":"{\"level\":\"ERROR\",\"message\":\"Unmarked error\"}"},
+  {"name":"missing-rejection-reason","valid":false,"json":"{\"event_type\":\"api_request_rejected\"}"},
+  {"name":"status-string","valid":false,"json":"{\"event_type\":\"plan_fetch_failed\",\"upstream_status\":\"503\"}"},
+  {"name":"status-outside-http-range","valid":false,"json":"{\"event_type\":\"plan_fetch_failed\",\"upstream_status\":999}"},
+  {"name":"zero-trace","valid":false,"json":"{\"event_type\":\"plan_fetch_failed\",\"trace_id\":\"00000000000000000000000000000000\"}"},
+  {"name":"invalid-event-format","valid":false,"json":"{\"event_type\":\"Unexpected Error\"}"},
+  {"name":"duplicate-group-key","valid":false,"json":"{\"event_type\":\"plan_fetch_failed\",\"event_type\":\"other_failed\"}"},
+  {"name":"duplicate-message","valid":false,"json":"{\"event_type\":\"plan_fetch_failed\",\"message\":\"First\",\"message\":\"Second\"}"},
+  {"name":"not-an-object","valid":false,"json":"[]"}
+]

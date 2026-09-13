@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://navikt.github.io/team-esyfo/contracts/runtime-error/v1.0.0/schema.json",
+  "title": "Team eSyfo runtime error contract v1.0.0",
+  "description": "Grouping metadata for terminal runtime errors and explicit api_request_rejected warnings. Native exception diagnostics and application fields are allowed; local tests remain responsible for privacy, cardinality and severity.",
+  "type": "object",
+  "required": [
+    "event_type"
+  ],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,79}$",
+      "description": "Code-owned stable event identity from the application's closed catalogue."
+    },
+    "error_code": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,79}$",
+      "description": "Stable code-owned enum or protocol code."
+    },
+    "rejection_reason": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,79}$",
+      "description": "Code-owned rejection reason from the application's closed catalogue. Required for api_request_rejected warnings."
+    },
+    "operation": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,79}$",
+      "description": "Stable logical operation from a closed set."
+    },
+    "upstream_status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "HTTP response status from an upstream service. Omitted when no response was received."
+    },
+    "exception_type": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9_.:$]{0,143})?(Error|Exception)$",
+      "description": "Normalised code-owned exception category from a closed set."
+    },
+    "logger_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "Stable logger name supplied by the logging framework."
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "not": {
+        "const": "00000000000000000000000000000000"
+      },
+      "description": "Non-zero W3C trace identifier from the active span. Required locally when tracing exists."
+    }
+  },
+  "if": {
+    "properties": {
+      "event_type": {
+        "const": "api_request_rejected"
+      }
+    },
+    "required": [
+      "event_type"
+    ]
+  },
+  "then": {
+    "properties": {
+      "rejection_reason": {}
+    },
+    "required": [
+      "rejection_reason"
+    ]
+  },
+  "additionalProperties": true,
+  "$comment": "This schema proves shape only. Root-level application fields are an open extension space, so promoting or constraining a previously unknown root field requires a new major version. Producer-near tests must also prove a closed event catalogue, bounded cardinality, active-span trace propagation, one terminal error log, and that privacy canaries are absent from the entire serialized JSON log."
+}

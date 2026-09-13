@@ -1,0 +1,165 @@
+name: Release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version already set in the npm and Maven packages, for example 0.1.0
+        type: string
+        required: true
+      dry_run:
+        description: Verify and stage packages without publishing
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-packages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Require an explicit release from main
+        run: |
+          test "$GITHUB_REPOSITORY" = navikt/esyfo-observability
+          test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the selected commit is on main
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install dependencies without executing package scripts or hooks
+        run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+      - name: Prepare esbuild without registry credentials
+        run: pnpm rebuild esbuild --ignore-pnpmfile
+      - run: pnpm check:contracts
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: node --test .github/scripts/release.test.mjs
+      - run: pnpm build
+      - run: pnpm pack:check
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-disabled: true
+      - name: Check JVM packages on Java 21
+        working-directory: jvm
+        run: ./gradlew check -PtestJavaVersion=21
+      - name: Check the same JVM packages on Java 25
+        working-directory: jvm
+        run: ./gradlew check -PtestJavaVersion=25
+      - name: Stage the verified Maven repository
+        run: cp -R jvm/build/staging-repository artifacts/maven
+      - name: Verify package names, versions and release files
+        run: node .github/scripts/release-check.mjs
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+      - name: Verify Maven publication locally without rebuilding
+        run: |
+          jvm/gradlew -p .github/release-maven publish \
+            -PreleaseVersion="$RELEASE_VERSION" \
+            -PreleaseDirectory="$GITHUB_WORKSPACE/artifacts/maven" \
+            -PreleaseRepository="file:$RUNNER_TEMP/maven-release-check"
+          for artifact in esyfo-logger esyfo-logger-testkit; do
+            relative="no/nav/esyfo/observability/$artifact/$RELEASE_VERSION/$artifact-$RELEASE_VERSION"
+            for suffix in .jar -sources.jar .pom .module; do
+              cmp "artifacts/maven/$relative$suffix" "$RUNNER_TEMP/maven-release-check/$relative$suffix"
+            done
+          done
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+      - name: Check registry versions without publishing
+        run: node .github/scripts/release-preflight.mjs
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-${{ github.sha }}
+          path: |
+            artifacts/npm/*.tgz
+            artifacts/maven/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: Publish verified packages
+    needs: verify
+    if: ${{ !inputs.dry_run && github.repository == 'navikt/esyfo-observability' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-${{ github.sha }}
+          path: artifacts/
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          registry-url: https://npm.pkg.github.com
+          package-manager-cache: false
+      - name: Recheck the downloaded artifact versions
+        run: node .github/scripts/release-check.mjs
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-disabled: true
+      - name: Refuse to overwrite an existing package version
+        run: node .github/scripts/release-preflight.mjs
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Publish the verified npm archives
+        run: |
+          npm publish "artifacts/npm/navikt-esyfo-logger-${RELEASE_VERSION}.tgz" \
+            --registry=https://npm.pkg.github.com --ignore-scripts
+          npm publish "artifacts/npm/navikt-esyfo-logger-testkit-${RELEASE_VERSION}.tgz" \
+            --registry=https://npm.pkg.github.com --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+      - name: Publish the verified Maven files
+        run: |
+          jvm/gradlew -p .github/release-maven publish \
+            -PreleaseVersion="$RELEASE_VERSION" \
+            -PreleaseDirectory="$GITHUB_WORKSPACE/artifacts/maven"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}

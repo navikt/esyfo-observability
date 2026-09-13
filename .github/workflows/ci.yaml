@@ -1,0 +1,71 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Node and packed npm consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies without executing package scripts or hooks
+        run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+      - name: Prepare esbuild without registry credentials
+        run: pnpm rebuild esbuild --ignore-pnpmfile
+      - run: pnpm check:contracts
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: node --test .github/scripts/release.test.mjs
+      - run: pnpm build
+      - run: pnpm pack:check
+
+  jvm:
+    name: JVM consumer on Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['21', '25']
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ matrix.java }}
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Check library and staged Maven consumer
+        working-directory: jvm
+        run: ./gradlew check -PtestJavaVersion="$TEST_JAVA_VERSION"
+        env:
+          TEST_JAVA_VERSION: ${{ matrix.java }}

@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/navikt/team-esyfo",
+  "revision": "236f1aaa57b3c5a1a7ed9302b2cbf3926234f196",
+  "path": "docs/public/contracts/runtime-error/v1.0.0",
+  "url": "https://navikt.github.io/team-esyfo/contracts/runtime-error/v1.0.0/schema.json",
+  "files": {
+    "schema.json": "f48387c964ff6779fd7857a4bdc18bb459521a0325d3d4141a5e12aba8099190",
+    "validate.mjs": "5871ab9f253c34997c4f4eb4d7091df39f7b25b550ed347d9d0181c346e961e3"
+  }
+}
