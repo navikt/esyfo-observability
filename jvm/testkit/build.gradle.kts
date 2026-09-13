@@ -11,7 +11,7 @@ dependencies {
     implementation("com.networknt:json-schema-validator:2.0.4")
     testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.13.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
     testImplementation("ch.qos.logback:logback-classic:1.6.3")
     testImplementation("net.logstash.logback:logstash-logback-encoder:9.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
