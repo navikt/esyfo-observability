@@ -14,8 +14,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.13.4")
     testImplementation("ch.qos.logback:logback-classic:1.6.3")
     testImplementation("net.logstash.logback:logstash-logback-encoder:9.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.11.0")
     testImplementation("io.ktor:ktor-server-test-host:3.5.2")
     testImplementation("io.ktor:ktor-server-status-pages:3.5.2")
 }
