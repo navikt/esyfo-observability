@@ -30,6 +30,7 @@ jobs:
         with:
           node-version: '24'
           cache: pnpm
+          registry-url: https://npm.pkg.github.com
       - name: Install dependencies without executing package scripts or hooks
         run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
         env:

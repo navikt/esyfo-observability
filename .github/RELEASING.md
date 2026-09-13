@@ -23,7 +23,9 @@ skal legges inn. GitHub Packages krever autentisering også for offentlige
 pakker. Consumer-repoenes tilgang må kontrolleres særskilt.
 
 CI trenger lesetilgang til de eksisterende Nav-loggerne som testes som
-dev-avhengigheter. Tokenet finnes bare i installsteget, hvor lifecycle scripts
+dev-avhengigheter. `setup-node` med `registry-url` lager en brukerbasert
+npm-konfigurasjon; pnpm utvider ikke token-plassholdere i repoets `.npmrc`.
+Tokenet finnes bare i installsteget, hvor lifecycle scripts
 og pnpm-hooks er avslått. Eventuell esbuild-forberedelse og alle tester kjøres
 uten registry-token. Det samme gjelder release-verifiseringen.
 

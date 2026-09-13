@@ -81,6 +81,12 @@ cd jvm
 ./gradlew check -PtestJavaVersion=25
 ```
 
-Installering av NAV-testavhengighetene krever vanlig GitHub Packages-lesetilgang. Bruk `NODE_AUTH_TOKEN` bare for installeringen, ikke under kjøring av tester eller andre scripts. Ingen credentials skal sjekkes inn.
+Installering av NAV-testavhengighetene krever vanlig GitHub Packages-lesetilgang. Lokalt brukes eksisterende brukerbasert pnpm-/npm-autentisering. Ved bruk av `NODE_AUTH_TOKEN` må plassholderen stå i brukerens `.npmrc`, ikke repoets:
+
+```ini
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+Bruk tokenet bare for installeringen, ikke under kjøring av tester eller andre scripts. CI lar `actions/setup-node` opprette denne brukerbaserte konfigurasjonen. [pnpm ignorerer token-plassholdere i prosjektets `.npmrc`](https://pnpm.io/npmrc#environment-variables-in-auth-settings); ikke omgå denne beskyttelsen. Ingen credentials skal sjekkes inn.
 
 `pnpm check` bygger og installerer de faktiske npm-arkivene i en separat konsument, med både ESM-, CommonJS- og typekontroll. JVM-testene bruker også publiseringsklare filer fra et lokalt Maven-repository. Releaseflyten publiserer disse verifiserte filene, uten å bygge dem på nytt. Ekte registrytilgang og appintegrasjon må i tillegg verifiseres ved første publisering og innføring.
