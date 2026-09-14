@@ -15,8 +15,8 @@ import { createEventLogger, defineEvent } from "@navikt/esyfo-logger";
 const log = createEventLogger(logger);
 
 const planHentingFeilet = defineEvent<{
-  error_code: "NETWORK_ERROR" | "INVALID_RESPONSE";
-  network_cause?: "TIMEOUT" | "DNS_LOOKUP_FAILED";
+  error_code: "UPSTREAM_HTTP_ERROR" | "INVALID_RESPONSE";
+  upstream_status: number;
 }>({
   name: "plan_fetch_failed",
   operation: "hent_plan",
@@ -25,8 +25,8 @@ const planHentingFeilet = defineEvent<{
 });
 
 log.event(planHentingFeilet, {
-  error_code: "NETWORK_ERROR",
-  network_cause: "DNS_LOOKUP_FAILED",
+  error_code: "UPSTREAM_HTTP_ERROR",
+  upstream_status: 503,
 });
 ```
 
@@ -39,7 +39,10 @@ Appen velger fortsatt riktig loggpunkt og alvorlighetsnivå. Adapteren endrer ik
 Et vurdert `Error` kan gis som tredje argument:
 
 ```ts
-log.event(planHentingFeilet, { error_code: "NETWORK_ERROR" }, reviewedCause);
+log.event(planHentingFeilet, {
+  error_code: "UPSTREAM_HTTP_ERROR",
+  upstream_status: 503,
+}, reviewedCause);
 ```
 
 Samme objekt videresendes som native `err`. Eksisterende logger bestemmer serialisering av melding, stack, cause og eventuelle egne feilfelter. Adapteren kopierer ikke feilobjektet og legger ikke til scrubbing. Gi bare feilobjekter som er vurdert som egnet for logging; noen HTTP-klienter legger request, headers eller responsdata på feilobjektet.
