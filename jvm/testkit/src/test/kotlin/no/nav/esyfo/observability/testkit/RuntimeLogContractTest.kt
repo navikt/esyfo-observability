@@ -19,6 +19,18 @@ class RuntimeLogContractTest {
     private enum class FailureCode { UPSTREAM_UNAVAILABLE, INVALID_RESPONSE }
 
     @Test
+    fun `invalid context marker always fails the contract regardless of its value`() {
+        for (value in listOf("true", "false", "null")) {
+            val record = "{\"event_type\":\"lookup_failed\",\"logging_context_invalid\":$value}"
+            assertEquals(
+                listOf(LogViolation(1, "Log context was invalid")),
+                lookupContract.validate(listOf(record), expectedCount = 1),
+            )
+            assertFailsWith<AssertionError> { lookupContract.assertValid(listOf(record), expectedCount = 1) }
+        }
+    }
+
+    @Test
     fun `dynamic event codes require an explicit closed catalog and validate actual serialized values`() {
         val event = Event<FailureCode>("plan_fetch_failed", Level.ERROR, "Could not fetch plan", errorCodeFrom = { it.name })
         val staticEvent = Event<Unit>("other_failed", Level.ERROR, "Other operation failed", errorCode = "OTHER_FAILURE")

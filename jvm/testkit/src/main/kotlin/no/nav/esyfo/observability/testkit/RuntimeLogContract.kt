@@ -84,6 +84,9 @@ public class RuntimeLogContract(catalog: Map<String, Set<String>>) {
                     add(LogViolation(index + 1, "Invalid JSON, duplicate fields, or trailing content"))
                     return@forEachIndexed
                 }
+                if (record.has("logging_context_invalid")) {
+                    add(LogViolation(index + 1, "Log context was invalid"))
+                }
                 val errors = schema.validate(record)
                 errors.forEach { error ->
                     add(LogViolation(index + 1, "Schema ${error.keyword} violation at ${error.instanceLocation}"))

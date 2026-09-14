@@ -6,6 +6,14 @@ const event = { name: "plan_fetch_failed", level: "error", message: "Kunne ikke 
 const record = { event_type: event.name, level: "ERROR", message: event.message, error_code: "NETWORK_ERROR" };
 
 describe("serialized log assertions", () => {
+  it.each([true, false, null, "private-fixture"])("rejects incomplete context even if the remaining event is valid", (marker) => {
+    const output = JSON.stringify({ ...record, logging_context_invalid: marker });
+    expect(() => assertLogEvent(output, { event })).toThrow(/logging_context_invalid/);
+    try { assertLogEvent(output, { event }); } catch (error) {
+      expect(String(error)).not.toContain("private-fixture");
+    }
+  });
+
   it("captures the actual Pino destination and checks the chosen event", () => {
     const capture = createLogCapture();
     const logger = pino({ messageKey: "message" }, capture.destination);

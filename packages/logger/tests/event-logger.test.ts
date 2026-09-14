@@ -84,7 +84,8 @@ describe("application events", () => {
     "pid",
     "hostname",
     "name",
-  ])("rejects the reserved context field %s without exposing its value", (field) => {
+    "logging_context_invalid",
+  ])("omits the reserved context field %s without exposing its value", (field) => {
     const lines: string[] = [];
     const log = createEventLogger(pino({ base: null }, { write: (line) => lines.push(line) }));
     const event = defineEvent<{ error_code: "NETWORK_ERROR" }>({
@@ -97,10 +98,12 @@ describe("application events", () => {
       [field]: "private-canary-value",
     } as { error_code: "NETWORK_ERROR" };
 
-    expect(() => log.event(event, context)).toThrow(
-      `Context must not set reserved field: ${field}`,
-    );
-    expect(lines).toEqual([]);
+    log.event(event, context);
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0]!)).toMatchObject({
+      event_type: event.name, error_code: "NETWORK_ERROR", level: 50, msg: event.message, logging_context_invalid: true,
+    });
+    expect(lines[0]).not.toContain("private-canary-value");
   });
 
   it("binds an API rejection to WARN and the application's operation and reasons", () => {

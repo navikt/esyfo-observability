@@ -33,6 +33,7 @@ En personverntest må legge en syntetisk sensitiv verdi inn i scenariet og bruke
 `assertLogEvent` krever nøyaktig én logglinje. `assertLogEvents` krever alle forventede linjer i rekkefølge, med samme forventningsformat. Ingen ekstra eller umerkede feil filtreres bort.
 
 - Gyldig JSON-objekt uten dupliserte felter, og samsvar med den pinnede v1-kontrakten.
+- Ingen `logging_context_invalid`-markør; ufullstendig kontekst skal rettes, selv om resten av hendelsen er gyldig.
 - Forventet hendelse, nivå og menneskelesbar melding, samt operasjon når den er definert.
 - Oppgitte kontekstfelter, faktisk `traceId`, nødvendig diagnostikk (`contains`) og fravær av syntetiske sensitive verdier (`excludes`).
 

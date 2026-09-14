@@ -10,6 +10,8 @@ log.info("Jobben er ferdig", optionalFields);
 
 // @ts-expect-error Ordinary diagnostics must not impersonate a classified error.
 log.info("Jobben starter", { error_code: "UPSTREAM_ERROR" });
+// @ts-expect-error Only the adapter may report incomplete context.
+log.info("Jobben starter", { logging_context_invalid: false });
 // @ts-expect-error Native trace context is not owned by the caller.
 log.debug("Behandler neste side", { trace_id: "1234567890abcdef1234567890abcdef" });
 const collision = { count: 1, event_type: "other_event" };

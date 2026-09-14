@@ -49,6 +49,9 @@ export function assertLogEvents(output: string, expected: readonly ExpectedLogEv
   }
   for (const [index, expectation] of expected.entries()) {
     const record = records[index]!;
+    if (Object.hasOwn(record, "logging_context_invalid")) {
+      throw new Error(`Log record ${index + 1}: logging_context_invalid means context was omitted; fix the log call`);
+    }
     assertContract(record, index);
     checkEqual(record.event_type, expectation.event.name, "event_type", index);
     checkEqual(levelOf(record), expectation.event.level, "level", index);

@@ -35,6 +35,7 @@ internal val RESERVED_FIELDS: Set<String> = setOf(
     "event_type", "operation", "error_code", "level", "level_value", "message",
     "@timestamp", "@version", "timestamp", "logger_name", "thread_name", "stack_trace",
     "trace_id", "span_id", "trace_flags", "traceId", "spanId",
+    INVALID_CONTEXT_FIELD,
 )
 
 /** Emits an event with no additional context. */
@@ -43,13 +44,25 @@ public fun Logger.emit(event: Event<Unit>, cause: Throwable? = null): Unit = emi
 /** Emits once through the supplied logger, retaining its configuration and the original cause. */
 public fun <C> Logger.emit(event: Event<C>, context: C, cause: Throwable? = null) {
     if (!isEnabledForLevel(event.level)) return
-    val errorCode = event.errorCode ?: event.errorCodeFrom?.invoke(context)
-    require(errorCode == null || errorCode.matches(CODE_VALUE_PATTERN)) { "Error code must be a stable uppercase code" }
+    val code = readLogContext { event.errorCode ?: event.errorCodeFrom?.invoke(context) }
+    var contextInvalid = code.isFailure
+    val errorCode = code.getOrNull()?.takeIf {
+        val valid = it.matches(CODE_VALUE_PATTERN)
+        if (!valid) contextInvalid = true
+        valid
+    }
+    val fields = mutableMapOf<String, Any>()
+    event.contextFields.forEach { (name, value) ->
+        val result = readLogContext { value(context) }
+        if (result.isFailure) contextInvalid = true
+        result.getOrNull()?.let { fields[name] = it }
+    }
     val builder = atLevel(event.level)
         .addKeyValue("event_type", event.name)
     event.operation?.let { builder.addKeyValue("operation", it) }
     errorCode?.let { builder.addKeyValue("error_code", it) }
-    event.contextFields.forEach { (name, value) -> value(context)?.let { builder.addKeyValue(name, it) } }
+    fields.forEach { (name, value) -> builder.addKeyValue(name, value) }
+    if (contextInvalid) builder.addKeyValue(INVALID_CONTEXT_FIELD, true)
     cause?.let(builder::setCause)
     builder.log(event.message)
 }

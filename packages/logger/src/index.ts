@@ -24,6 +24,7 @@ const reservedFields = [
   "pid",
   "hostname",
   "name",
+  "logging_context_invalid",
 ] as const;
 type ReservedField = (typeof reservedFields)[number];
 const reservedFieldSet: ReadonlySet<string> = new Set(reservedFields);
@@ -53,6 +54,8 @@ export interface Event<C extends object> extends EventDefinition {
 
 export type NativeLogger = {
   [L in Level]: (fields: object, message: string) => void;
+} & {
+  isLevelEnabled?: (level: Level | "debug") => boolean;
 };
 
 export interface EventLogger {
@@ -118,14 +121,10 @@ export function apiRequestRejected<C extends { rejection_reason: string }>(
 export function createEventLogger(logger: NativeLogger): EventLogger {
   return {
     event(event, context, cause) {
-      for (const field of Object.keys(context)) {
-        if (reservedFieldSet.has(field)) {
-          throw new TypeError(`Context must not set reserved field: ${field}`);
-        }
-      }
+      if (logger.isLevelEnabled?.(event.level) === false) return;
       logger[event.level](
         {
-          ...context,
+          ...readContext(context, "event"),
           event_type: event.name,
           ...(event.operation === undefined ? {} : { operation: event.operation }),
           ...(cause === undefined ? {} : { err: cause }),
@@ -138,41 +137,66 @@ export function createEventLogger(logger: NativeLogger): EventLogger {
 
 /** One application entry point, retaining the native logger's configuration. */
 export function createLogger(logger: NativeApplicationLogger): ApplicationLogger {
+  function diagnostic(level: "info" | "debug", message: string, fields?: object): void {
+    if (logger.isLevelEnabled?.(level) === false) return;
+    const context = readContext(fields, "diagnostic");
+    if (typeof message !== "string") context.logging_context_invalid = true;
+    logger[level](context, typeof message === "string" ? message : "Invalid diagnostic message");
+  }
+
   return {
     ...createEventLogger(logger),
     info(message, fields) {
-      assertDiagnosticMessage(message);
-      logger.info(diagnosticFields(fields), message);
+      diagnostic("info", message, fields);
     },
     debug(message, fields) {
-      assertDiagnosticMessage(message);
-      logger.debug(diagnosticFields(fields), message);
+      diagnostic("debug", message, fields);
     },
   };
 }
 
-function assertDiagnosticMessage(message: string): void {
-  if (typeof message !== "string" || message.trim() === "") {
-    throw new TypeError("Diagnostic message must be a non-empty string");
+/** Only metadata reads are guarded; native logging and reviewed nested event values remain native. */
+function readContext(context: object | undefined, kind: "event" | "diagnostic"): Record<string, unknown> {
+  if (kind === "diagnostic" && context === undefined) return {};
+  const entries: [string, unknown][] = [];
+  let invalid = false;
+  let keys: string[];
+  try {
+    if (context === null || typeof context !== "object" || Array.isArray(context)) {
+      return { logging_context_invalid: true };
+    }
+    if (kind === "diagnostic") {
+      const prototype: unknown = Object.getPrototypeOf(context);
+      if (prototype !== Object.prototype && prototype !== null) return { logging_context_invalid: true };
+    }
+    keys = Object.keys(context);
+    invalid = Object.getOwnPropertySymbols(context).length > 0;
+  } catch {
+    return { logging_context_invalid: true };
   }
+
+  const reserved = kind === "event" ? reservedFieldSet : diagnosticReservedFieldSet;
+  for (const field of keys) {
+    if (reserved.has(field)) {
+      invalid = true;
+      continue;
+    }
+    try {
+      const value: unknown = (context as Record<string, unknown>)[field];
+      if (kind === "diagnostic" && !isDiagnosticValue(value)) {
+        invalid = true;
+      } else if (kind === "event" || value !== undefined) {
+        entries.push([field, value]);
+      }
+    } catch {
+      invalid = true;
+    }
+  }
+  if (invalid) entries.push(["logging_context_invalid", true]);
+  return Object.fromEntries(entries);
 }
 
-function diagnosticFields(fields: object = {}): object {
-  const invalidFields = "Diagnostic fields must be a plain object containing only JSON primitives";
-  if (fields === null || typeof fields !== "object") throw new TypeError(invalidFields);
-  const prototype: unknown = Object.getPrototypeOf(fields);
-  if (prototype !== Object.prototype && prototype !== null) throw new TypeError(invalidFields);
-  if (Object.getOwnPropertySymbols(fields).length > 0) throw new TypeError(invalidFields);
-
-  const entries = Object.entries(fields);
-  for (const [field, value] of entries) {
-    if (diagnosticReservedFieldSet.has(field)) {
-      throw new TypeError(`Diagnostic fields must not set reserved field: ${field}`);
-    }
-    if (value !== undefined && value !== null && typeof value !== "string" && typeof value !== "boolean" &&
-      !(typeof value === "number" && Number.isFinite(value))) {
-      throw new TypeError(invalidFields);
-    }
-  }
-  return Object.fromEntries(entries.filter(([, value]) => value !== undefined));
+function isDiagnosticValue(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === "string" || typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value));
 }

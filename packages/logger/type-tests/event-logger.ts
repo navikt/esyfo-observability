@@ -50,6 +50,8 @@ log.event(planHentingFeilet, { error_code: "NETWORK_ERROR" }, { response: "priva
 
 // @ts-expect-error Definitions cannot reserve a context field for the severity.
 defineEvent<{ error_code: "NETWORK_ERROR"; level: string }>(definition);
+// @ts-expect-error Event context cannot replace the adapter's validation marker.
+defineEvent<{ logging_context_invalid: boolean }>(definition);
 
 // @ts-expect-error Open dictionaries defeat a closed context declaration.
 defineEvent<Record<string, unknown>>(definition);

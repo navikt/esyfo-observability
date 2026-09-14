@@ -73,6 +73,9 @@ class EventDefinitionTest {
         assertFailsWith<IllegalArgumentException> { Event<Unit>("failed", Level.TRACE, "Failed") }
         assertFailsWith<IllegalArgumentException> { Event<Unit>("failed", Level.ERROR, "Failed", operation = "/request/123") }
         assertFailsWith<IllegalArgumentException> { Event<Unit>("failed", Level.ERROR, "Failed", errorCode = "not-a-code") }
+        assertFailsWith<IllegalArgumentException> {
+            Event<Unit>("failed", Level.ERROR, "Failed", fields = mapOf("logging_context_invalid" to { false }))
+        }
     }
 
     @Test
