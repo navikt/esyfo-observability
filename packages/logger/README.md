@@ -44,11 +44,11 @@ Ukjente koder, manglende felter, feilstavede felter og ekstra felter via variabl
 
 Bruk `event` for appens WARN/ERROR/FATAL og navngitte domeneutfall. Vanlig status og utviklingsdiagnostikk går gjennom `info`/`debug`. Inngangen har ingen fritekstmetoder for `warn` eller `error`, og `info`/`debug` legger ikke til `event_type`.
 
-Diagnosefeltene er et vanlig objekt med navngitte felter av typen string, endelig number, boolean eller null. `undefined` utelates før native serialisering. Objekter, arrays, funksjoner og `Error` er ikke diagnosefelt; vurdert feildiagnostikk hører til en typed hendelse. Reserverte felter som `event_type`, `error_code`, `rejection_reason`, nivå og trace avvises både av typer og ved kjøring. Primitive felter er ikke en personverngaranti: heller ikke meldinger eller strenger skal inneholde personopplysninger eller tokens.
+Diagnosefeltene er et vanlig objekt med navngitte felter av typen string, endelig number, boolean eller null. `undefined` utelates før native serialisering. Objekter, arrays, funksjoner og `Error` er ikke diagnosefelt; vurdert feildiagnostikk hører til en typed hendelse. Reserverte felter som `event_type`, `error_code`, `rejection_reason`, nivå og trace avvises av typene. Ved kjøring utelates ugyldige felter og loggen merkes som beskrevet under. Primitive felter er ikke en personverngaranti: heller ikke meldinger eller strenger skal inneholde personopplysninger eller tokens.
 
 Appen velger fortsatt riktig loggpunkt og alvorlighetsnivå. Adapteren endrer ikke respons, retry, cancellation eller loggeierskap. Native logger brukes til oppsett, redigering av sensitive felter og integrasjon med rammeverk. Logger fra tredjepartsbiblioteker og nettleserens APM fortsetter uendret; de skal ikke omskrives til apphendelser. Metrikker og tracing er separate mekanismer.
 
-`createEventLogger(nativeLogger)` fra 0.1.0 fungerer fortsatt som før. `createLogger` legger til `info` og `debug` uten å endre `event`-kallene eller loggerens konfigurerte nivåfilter.
+`createEventLogger(nativeLogger)` fra 0.1.0 er fortsatt tilgjengelig og bruker samme feilpolicy som `createLogger`. Den samlede inngangen legger til `info` og `debug`. Native nivåfilter beholdes; når loggeren tilbyr `isLevelEnabled`, leses ikke konteksten for et avslått nivå.
 
 ## Diagnostikk
 
@@ -88,7 +88,9 @@ Hendelsen heter `api_request_rejected`, har WARN-nivå og bruker samme `event`-k
 
 ## Hva kontrollene beviser
 
-Metadata kontrolleres og fryses når `defineEvent` kalles. Ved logging hindres konteksten fra å overskrive blant annet hendelse, melding, nivå, native `err`/`cause` og trace-felter. Slike kollisjoner gir `TypeError` med feltnavnet, aldri feltverdien. Dette er programmeringsfeil, ikke feilsituasjoner adapteren prøver å håndtere.
+Metadata kontrolleres og fryses når `defineEvent` kalles; ugyldige statiske definisjoner gir fortsatt `TypeError`. Ved logging utelates reserverte felter, diagnoseverdier utenfor den primitive kontrakten og felter med en getter som kaster. Andre felter, hendelsens metadata og opprinnelig `cause` beholdes. Logglinjen får `logging_context_invalid=true`, som testkit avviser. Markøren er reservert for biblioteket; den inneholder verken feltverdier eller feilmeldingen fra en getter. Ingen ekstra logglinje opprettes.
+
+Vanlige strengmeldinger videresendes uendret, også tomme strenger. Dersom JavaScript eller et cast omgår meldingstypen, brukes den faste meldingen `Invalid diagnostic message` og markøren; verdien konverteres ikke til tekst. Native logger-/encoderfeil fanges ikke. Deklarerte, nestede hendelsesfelt og vurderte feilobjekter videresendes som før, uten rekursiv validering eller scrubbing.
 
 Det kjøres ikke et runtime-schema for hver logg. TypeScript-kontrollene kan omgås med casts, `any` eller ved å viske ut felter fra en variabels statiske type. De er heller ikke en personverngaranti. Bruk faktisk serialisering i appens vanlige tester for kontrakt, lokal katalog, diagnostikk, riktig nivå og antall hendelser. Biblioteket kan ikke oppdage at samme feil logges på flere lag i appen.
 

@@ -84,6 +84,8 @@ Typer hjelper mot feil bruk, men beviser ikke personvern. Test en faktisk feilsi
 
 ## Kontrakt og versjoner
 
+**0.2.1: feil i loggkontekst.** Ugyldige runtime-felter og felter som ikke kan leses, utelates uten å avbryte applikasjonsflyten. Gyldig diagnostikk, hendelsesidentitet og opprinnelig `cause` beholdes; samme linje får `logging_context_invalid=true`. Testkit avviser markøren, slik at tapet må rettes i appens tester. Statiske hendelsesdefinisjoner valideres fortsatt ved oppsett. Native logger-/encoderfeil og JVM-avbrudd fanges ikke av biblioteket; dette er ingen generell garanti mot feil fra logging.
+
 [runtime-error v1.0.0](contracts/runtime-error/v1.0.0/schema.json) er en byte-identisk kopi av den allerede publiserte kontrakten i team-esyfo. Opprinnelig `$id` og URL beholdes. `source.json` peker på kildecommit, og sjekksummer kontrolleres i bygg og pakket teststøtte. Endre ikke en utgitt kontrakt på stedet; en endret kontrakt får ny versjon. Bibliotekversjon og kontraktversjon er separate.
 
 Kontrakten beskriver formen på loggen, ikke alle appens mulige hendelser eller hva det er riktig å logge. Typekontroll og appens scenariotester dekker det lokale innholdet. De samme gyldige og ugyldige JSON-eksemplene kjøres gjennom begge språkstakkene.
@@ -98,13 +100,13 @@ Kontrakten beskriver formen på loggen, ikke alle appens mulige hendelser eller 
 
 **0.2.0** tilfører den felles logginngangen og kontekstavhengige JVM-feilkoder. `createEventLogger` og `Logger.emit` fra 0.1.0 er fortsatt tilgjengelige for gradvis innføring. JVM-konsumenter må kompileres på nytt ved oppgradering. Runtime-error-kontrakt v1.0.0 er uendret.
 
-Versjon 0.1.0 er publisert. Bruk eksemplene under etter at 0.2.0 er publisert fra `main`; en bibliotek-PR alene gjør ikke pakken tilgjengelig. Pinn pakkeversjonen, og verifiser pakketilgang i appens CI før merge.
+Bruk en publisert versjon fra [utgivelsene](https://github.com/navikt/esyfo-observability/releases); en bibliotek-PR alene gjør ikke pakken tilgjengelig. Eksemplene under viser 0.2.1. Kontroller at versjonen er publisert, pinn den og verifiser pakketilgang i appens CI før merge.
 
 For Node/Next med eksisterende GitHub Packages-oppsett:
 
 ```sh
-pnpm add --save-exact @navikt/esyfo-logger@0.2.0
-pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.2.0
+pnpm add --save-exact @navikt/esyfo-logger@0.2.1
+pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.2.1
 ```
 
 Node-pakkene bruker appens vanlige GitHub Packages-autentisering. JVM-pakkene kan lastes ned uten credentials gjennom Navs pakkespeil: se [avhengigheter og registryoppsett](jvm/README.md#avhengigheter-og-verifisering). Biblioteket trenger ingen produksjonssecrets. Se [releaseveiledningen](.github/RELEASING.md) for publisering.

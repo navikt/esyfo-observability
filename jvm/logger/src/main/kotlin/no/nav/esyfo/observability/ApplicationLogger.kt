@@ -22,13 +22,25 @@ public class ApplicationLogger internal constructor(private val logger: Logger) 
 
     private fun diagnostic(level: Level, message: String, fields: Map<String, Any?>) {
         if (!logger.isEnabledForLevel(level)) return
-        require(message.isNotBlank()) { "Diagnostic message must not be blank" }
-        require(fields.keys.none { it in RESERVED_FIELDS || it == "rejection_reason" }) {
-            "Diagnostic fields must not replace event, logger, or trace fields"
+        val prepared = mutableMapOf<String, Any>()
+        var contextInvalid = false
+        val iteration = readLogContext {
+            fields.entries.forEach { entry ->
+                val field = readLogContext { entry.key to entry.value }
+                if (field.isFailure) contextInvalid = true
+                field.getOrNull()?.let { (name, value) ->
+                    if (name in RESERVED_FIELDS || name == "rejection_reason" || !isDiagnosticValue(value)) {
+                        contextInvalid = true
+                    } else {
+                        value?.let { prepared[name] = it }
+                    }
+                }
+            }
         }
-        require(fields.values.all(::isDiagnosticValue)) { "Diagnostic fields must be primitive values or null" }
+        if (iteration.isFailure) contextInvalid = true
         val builder = logger.atLevel(level)
-        fields.forEach { (name, value) -> value?.let { builder.addKeyValue(name, it) } }
+        prepared.forEach { (name, value) -> builder.addKeyValue(name, value) }
+        if (contextInvalid) builder.addKeyValue(INVALID_CONTEXT_FIELD, true)
         builder.log(message)
     }
 }

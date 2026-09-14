@@ -22,7 +22,8 @@ Alle appskrevne WARN/ERROR skal ha en hendelse. Enkel diagnostikk kan bruke
 Det finnes ingen generisk `warn`/`error` på denne loggeren.
 
 INFO/DEBUG-felter kan være String, Boolean, primitive endelige tall eller null.
-Null utelates. Reserverte hendelses-, logger- og tracefelter, objekter og arrays avvises;
+Null utelates. Reserverte hendelses-, logger- og tracefelter, objekter og arrays utelates
+enkeltvis og markerer loggen med `logging_context_invalid=true`;
 bruk typed hendelseskontekst når det trengs strukturert diagnostikk.
 Nivået sjekkes før feltlesere/feilkodeleser evalueres. Vanlige metodeargumenter
 evalueres fortsatt av Kotlin før kallet.
@@ -61,13 +62,22 @@ Ugyldige statiske navn/koder, tom melding og andre nivåer enn INFO/WARN/ERROR
 avvises når definisjonen opprettes. Bruk `errorCode = "PLAN_SERVICE_UNAVAILABLE"` når
 koden alltid er den samme. `errorCodeFrom` velger en kode fra typed kontekst, slik at
 man ikke trenger én hendelsesdefinisjon per feilkode. De to kan ikke kombineres.
-En dynamisk kode valideres før hendelsen logges; null utelater `error_code`.
+En ugyldig dynamisk kode utelates og markerer loggen med `logging_context_invalid=true`.
+Null utelater `error_code` uten markering.
 
 En feltleser som returnerer `null` utelater det toppnivåfeltet. Det passer for
 `upstream_status` når ingen HTTP-respons ble mottatt. Nested diagnostikk, inkludert
 nullverdier, og den originale exception med melding/årsakskjede endres ikke.
 PDLs godkjente feildel kan fortsatt legges i `pdl_errors`; biblioteket fjerner den ikke.
 Appen må velge egnet diagnostikk og teste personvern, ikke sende vilkårlige payloads.
+
+Hvis en kontekst- eller feilkodeleser kaster en vanlig exception, utelates bare den
+verdien. Hendelsen beholder nivå, melding, gyldige felt og opprinnelig cause; den
+samme logglinjen får `logging_context_invalid=true`. Markøren er reservert og kan
+ikke settes av appkontekst. Ugyldige statiske definisjoner feiler fortsatt ved opprettelse.
+CancellationException, InterruptedException og JVM Error propagerer uendret.
+Native logger- og encoderkall fanges ikke; dette er ingen generell garanti mot
+loggfeil. Vanlige metodeargumenter evalueres fortsatt før biblioteket kalles.
 
 Bruk `Event<Unit>` og `log.event(event, cause = failure)` når hendelsen ikke har ekstra kontekst.
 
@@ -126,6 +136,9 @@ Katalogen er felles for definisjonene som gis inn, ikke en kontroll av koblingen
 mellom hver hendelse og dens mulige koder. Test slike sammenhenger eksplisitt når nødvendig.
 For andre serialiserte logger finnes også `RuntimeLogContract(catalog: Map<String, Set<String>>)`.
 Kontrakten gjelder navngitte hendelser, ikke enkle INFO/DEBUG-diagnostikkmeldinger.
+Testkit avviser alltid tilstedeværelsen av `logging_context_invalid`, også med
+verdien false eller null, slik at feil i loggkontekst feiler i CI uten å maskere
+applikasjonens opprinnelige utfall i runtime. Det delte v1-schemaet er uendret.
 
 Velg appendernavnet fra appens konfigurasjon; den må finnes på valgt logger eller
 root-loggeren. Capture endrer ikke nivå, additivity, streams eller MDC og stopper
@@ -150,8 +163,8 @@ repositories {
 }
 
 dependencies {
-    implementation("no.nav.esyfo.observability:esyfo-logger:0.2.0")
-    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.2.0")
+    implementation("no.nav.esyfo.observability:esyfo-logger:0.2.1")
+    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.2.1")
 }
 ```
 

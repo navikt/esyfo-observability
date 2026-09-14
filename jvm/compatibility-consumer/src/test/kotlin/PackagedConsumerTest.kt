@@ -10,12 +10,45 @@ import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PackagedConsumerTest {
     private enum class Reason { ACCESS_NOT_GRANTED }
     private data class Context(val reason: Reason)
     private enum class FailureCode { UPSTREAM_UNAVAILABLE, INVALID_RESPONSE }
+
+    @Test
+    fun `packaged logger preserves application failure while testkit rejects invalid context`() {
+        val native = LoggerFactory.getLogger("packaged-invalid-context") as Logger
+        val log = createLogger(native)
+        val failure = IllegalStateException("Original upstream failure")
+        val event = Event<Unit>(
+            "plan_fetch_failed", Level.ERROR, "Could not fetch plan",
+            errorCodeFrom = { error("private-reader-value") },
+            fields = mapOf("upstream_status" to { 503 }),
+        )
+        val capture = captureLogs(native, "JSON")
+        capture.use {
+            val propagated = assertFailsWith<IllegalStateException> {
+                try {
+                    throw failure
+                } catch (original: IllegalStateException) {
+                    log.event(event, cause = original)
+                    throw original
+                }
+            }
+            assertSame(failure, propagated)
+        }
+        val record = capture.records.single()
+        assertContains(record, "\"upstream_status\":503")
+        assertContains(record, "\"logging_context_invalid\":true")
+        assertContains(record, "Original upstream failure")
+        assertTrue("private-reader-value" !in record)
+        val contract = RuntimeLogContract.forEvents(event, dynamicErrorCodes = setOf("UPSTREAM_UNAVAILABLE"))
+        assertFailsWith<AssertionError> { contract.assertValid(capture.records, expectedCount = 1) }
+    }
 
     @Test
     fun `packaged application logger supports typed dynamic codes and plain diagnostics`() {

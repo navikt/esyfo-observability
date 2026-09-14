@@ -1,6 +1,6 @@
 {
   "name": "@navikt/esyfo-logger-testkit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Assertions for actual serialized application logs",
   "license": "MIT",
   "type": "module",
