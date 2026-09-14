@@ -1,38 +1,67 @@
 # JVM
 
-Små, typesikre hendelsesdefinisjoner over appens eksisterende SLF4J-logger.
+Én inngang for appens logger over eksisterende SLF4J.
 Kotlin 2.4.10+, Java 21+ og SLF4J 2. Bygg/test verifiseres på Java 21 og 25.
 Appen beholder Logback, encoder, transport og sporingsoppsett. Ingen Ktor-plugin,
 Spring-modul, retry-wrapper eller scrubber installeres.
+
+## Én logger i appen
+
+```kotlin
+import no.nav.esyfo.observability.createLogger
+import org.slf4j.LoggerFactory
+
+// I appens loggingoppsett; resten av appen bruker log.
+val nativeLogger = LoggerFactory.getLogger("PlanService")
+val log = createLogger(nativeLogger)
+```
+
+Bruk `log.event(...)` for navngitte hendelser; definisjonen bestemmer nivået.
+Alle appskrevne WARN/ERROR skal ha en hendelse. Enkel diagnostikk kan bruke
+`log.info("Worker started")` eller `log.debug("Batch read", mapOf("count" to 3))`.
+Det finnes ingen generisk `warn`/`error` på denne loggeren.
+
+INFO/DEBUG-felter kan være String, Boolean, primitive endelige tall eller null.
+Null utelates. Reserverte hendelses-, logger- og tracefelter, objekter og arrays avvises;
+bruk typed hendelseskontekst når det trengs strukturert diagnostikk.
+Nivået sjekkes før feltlesere/feilkodeleser evalueres. Vanlige metodeargumenter
+evalueres fortsatt av Kotlin før kallet.
+
+Native SLF4J brukes i bindingen over og der et rammeverk krever den typen, ikke som
+en alternativ inngang for appskrevne logger. Håndhev denne grensen i appens statiske
+kodekontroll med et avgrenset unntak for bindingen; biblioteket installerer ingen lintregel.
+Tredjeparts- og rammeverkslogger fortsetter uendret. Den eksisterende `Logger.emit`
+er kildekompatibel for migrering/integrasjon, men nye appkall bruker `log.event`.
 
 ## En lokal hendelse
 
 ```kotlin
 import no.nav.esyfo.observability.Event
-import no.nav.esyfo.observability.emit
-import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
-data class PlanFetchFailure(val upstreamStatus: Int?)
+enum class PlanFailureCode { UPSTREAM_UNAVAILABLE, INVALID_RESPONSE }
+data class PlanFetchFailure(val code: PlanFailureCode, val upstreamStatus: Int?)
 
 val planFetchFailed = Event<PlanFetchFailure>(
     name = "plan_fetch_failed",
     level = Level.ERROR,
     message = "Kunne ikke hente oppfølgingsplan",
     operation = "fetch_plan",
-    errorCode = "PLAN_SERVICE_UNAVAILABLE",
+    errorCodeFrom = { it.code.name },
     fields = mapOf("upstream_status" to { it.upstreamStatus }),
 )
 
-val log = LoggerFactory.getLogger("PlanService")
-log.emit(planFetchFailed, PlanFetchFailure(503), cause = failure)
+log.event(planFetchFailed, PlanFetchFailure(PlanFailureCode.UPSTREAM_UNAVAILABLE, 503), cause = failure)
 ```
 
 Definisjonen ligger i appen. Ny hendelse krever ingen biblioteksrelease.
 Feil konteksttype avvises av Kotlin-kompilatoren. Navn, nivå, melding og feltnøkler
 eies av definisjonen; ekstra kontekst kan ikke overskrive standardfelter eller trace.
 Ugyldige statiske navn/koder, tom melding og andre nivåer enn INFO/WARN/ERROR
-avvises når definisjonen opprettes. Vanlige DEBUG/TRACE-logger kan fortsatt gå direkte til SLF4J.
+avvises når definisjonen opprettes. Bruk `errorCode = "PLAN_SERVICE_UNAVAILABLE"` når
+koden alltid er den samme. `errorCodeFrom` velger en kode fra typed kontekst, slik at
+man ikke trenger én hendelsesdefinisjon per feilkode. De to kan ikke kombineres.
+En dynamisk kode valideres før hendelsen logges; null utelater `error_code`.
 
 En feltleser som returnerer `null` utelater det toppnivåfeltet. Det passer for
 `upstream_status` når ingen HTTP-respons ble mottatt. Nested diagnostikk, inkludert
@@ -40,7 +69,7 @@ nullverdier, og den originale exception med melding/årsakskjede endres ikke.
 PDLs godkjente feildel kan fortsatt legges i `pdl_errors`; biblioteket fjerner den ikke.
 Appen må velge egnet diagnostikk og teste personvern, ikke sende vilkårlige payloads.
 
-Bruk `Event<Unit>` og `log.emit(event, cause = failure)` når hendelsen ikke har ekstra kontekst.
+Bruk `Event<Unit>` og `log.event(event, cause = failure)` når hendelsen ikke har ekstra kontekst.
 
 ## Felles avvisningshendelse
 
@@ -57,7 +86,7 @@ val accessRejected = apiRequestRejected<AccessRejection>(
     fields = mapOf("pdp_decision" to { it.pdpDecision }),
 )
 
-log.emit(accessRejected, AccessRejection(RejectionReason.ACCESS_NOT_GRANTED, "Deny"))
+log.event(accessRejected, AccessRejection(RejectionReason.ACCESS_NOT_GRANTED, "Deny"))
 ```
 
 Dette gir `event_type=api_request_rejected`, WARN og påkrevd `rejection_reason`.
@@ -74,12 +103,14 @@ ikke en ny standardencoder som kan skjule feil i appens virkelige konfigurasjon.
 import no.nav.esyfo.observability.testkit.RuntimeLogContract
 import no.nav.esyfo.observability.testkit.captureLogs
 
-val capture = captureLogs(log as ch.qos.logback.classic.Logger, "stdout_json")
+val capture = captureLogs(nativeLogger as ch.qos.logback.classic.Logger, "stdout_json")
 capture.use {
-    log.emit(planFetchFailed, PlanFetchFailure(503), cause = failure)
+    log.event(planFetchFailed, PlanFetchFailure(PlanFailureCode.UPSTREAM_UNAVAILABLE, 503), cause = failure)
 }
-RuntimeLogContract.forEvents(planFetchFailed)
-    .assertValid(capture.records, expectedCount = 1)
+RuntimeLogContract.forEvents(
+    planFetchFailed,
+    dynamicErrorCodes = PlanFailureCode.entries.map { it.name }.toSet(),
+).assertValid(capture.records, expectedCount = 1)
 
 val rejectionContract = RuntimeLogContract.forEvents(
     accessRejected,
@@ -87,9 +118,14 @@ val rejectionContract = RuntimeLogContract.forEvents(
 )
 ```
 
-Eventnavn, operation og errorCode avledes fra de faktiske definisjonene. Bare
-dynamiske lukkede `rejectionReasons`/`exceptionTypes` gis separat, gjerne fra lokale enums.
+Eventnavn, operation og statisk errorCode avledes fra de faktiske definisjonene.
+Dynamiske lukkede `dynamicErrorCodes`/`rejectionReasons`/`exceptionTypes` gis separat,
+gjerne fra lokale enums. En definisjon med `errorCodeFrom` krever eksplisitte
+`dynamicErrorCodes`; testkit prøver ikke å utlede mulige verdier fra en funksjon.
+Katalogen er felles for definisjonene som gis inn, ikke en kontroll av koblingen
+mellom hver hendelse og dens mulige koder. Test slike sammenhenger eksplisitt når nødvendig.
 For andre serialiserte logger finnes også `RuntimeLogContract(catalog: Map<String, Set<String>>)`.
+Kontrakten gjelder navngitte hendelser, ikke enkle INFO/DEBUG-diagnostikkmeldinger.
 
 Velg appendernavnet fra appens konfigurasjon; den må finnes på valgt logger eller
 root-loggeren. Capture endrer ikke nivå, additivity, streams eller MDC og stopper
@@ -104,7 +140,7 @@ En syntetisk MDC-test beviser ikke at NAIS-agenten sporer hele produksjonsforlø
 
 ## Avhengigheter og verifisering
 
-Versjon 0.1.0 er publisert i GitHub Packages. De offentlige pakkene kan hentes
+Pakkene publiseres i GitHub Packages. De offentlige pakkene kan hentes
 uten credentials gjennom [Navs pakkespeil](https://github.com/navikt/github-package-registry-mirror):
 
 ```kotlin
@@ -114,8 +150,8 @@ repositories {
 }
 
 dependencies {
-    implementation("no.nav.esyfo.observability:esyfo-logger:0.1.0")
-    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.1.0")
+    implementation("no.nav.esyfo.observability:esyfo-logger:0.2.0")
+    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.2.0")
 }
 ```
 
@@ -135,7 +171,9 @@ cd jvm
 
 Java 21 brukes til bygg; testkjøring kan velge 21 eller 25. `check` inkluderer Ktor-,
 worker- og coroutine-forløp, felles Node/JVM-kontraktfixtures, et separat prosjekt som
-konsumerer de pakkede Maven-artefaktene, og en negativ compile-test med feil konteksttype.
+konsumerer de pakkede Maven-artefaktene, og negative compile-tester med feil konteksttype,
+feil dynamisk kodetype og generisk WARN uten hendelse. 0.2.0 beholder kildekallene fra
+0.1.0, men appen må bygges på nytt ved oppgradering; binærkompatibilitet er ikke garantert.
 
 `publishAllPublicationsToStagingRepository` legger bare artefakter i
 `jvm/build/staging-repository`. Dette er lokal staging, ikke ekstern publisering.

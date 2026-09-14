@@ -1,6 +1,6 @@
 # eSyfo observability
 
-Små, typesikre loggbiblioteker og teststøtte for Team eSyfo. Appen bruker sin eksisterende logger og definerer hendelsene der de hører hjemme. Biblioteket gjør hendelser konsistente og lette å teste, uten å overta logging, tracing eller feilhåndtering.
+En felles logginngang og teststøtte for Team eSyfo. Appen beholder sin eksisterende logger og definerer hendelsene der de hører hjemme. Biblioteket gir typesikre hendelser og enkel info/debug, uten å overta transport, tracing eller feilhåndtering.
 
 | Pakke | Bruk |
 | --- | --- |
@@ -19,11 +19,21 @@ Dette repoet samler bibliotekene, den pinnede loggkontrakten og felles testeksem
 
 ## Kort eksempel
 
+Koble til den eksisterende loggeren én gang i en lokal servermodul:
+
 ```ts
 import { logger } from "@navikt/next-logger";
-import { createEventLogger, defineEvent } from "@navikt/esyfo-logger";
+import { createLogger } from "@navikt/esyfo-logger";
 
-const log = createEventLogger(logger);
+export const log = createLogger(logger);
+```
+
+Resten av appen importerer denne inngangen. Hendelsen ligger nær koden som eier den:
+
+```ts
+import { defineEvent } from "@navikt/esyfo-logger";
+import { log } from "./logger.js";
+
 const planHentingFeilet = defineEvent<{
   error_code: "NETWORK_ERROR" | "INVALID_RESPONSE";
 }>({
@@ -33,9 +43,27 @@ const planHentingFeilet = defineEvent<{
 });
 
 log.event(planHentingFeilet, { error_code: "NETWORK_ERROR" });
+log.info("Oppryddingen er ferdig", { removed_count: 12 });
 ```
 
 Kotlin bruker samme loggfelter, men vanlige dataklasser og SLF4J: se [JVM-eksemplene](jvm/README.md). Teststøtten er en utviklings-/testavhengighet, ikke en del av appens runtime.
+
+## Hvilken inngang skal jeg bruke?
+
+| Du skal logge | Bruk |
+| --- | --- |
+| En advarsel eller feil i migrert serverkode | `log.event(...)` med lokal, typed definisjon. Definisjonen velger nivå og forklaring. |
+| Vanlig informasjon eller debug | `log.info(...)` / `log.debug(...)`, med valgfri enkel diagnostikk. |
+| En navngitt INFO-hendelse som skal kunne grupperes | `log.event(...)` med INFO i definisjonen. |
+| Framework-/avhengighetslogger eller loggerens oppstart | Eksisterende native oppsett. Biblioteket overtar ikke disse. |
+| Nettleserfeil | Appens nettleserintegrasjon/APM/Faro, ikke serverbiblioteket. |
+| Antall, varighet eller tracing | Eksisterende metrikker og OpenTelemetry/APM, ikke logghendelser som erstatning. |
+
+Den felles inngangen har ingen fri `warn` eller `error`. Dermed slipper kallstedet å velge mellom to måter å logge samme feil. Det betyr ikke at alle forventede avvisninger skal få en logg: appen velger fortsatt hva som trenger diagnostikk og hvilket lag som eier loggen.
+
+Typer sikrer bruken av inngangen, ikke at den blir brukt. Appens CI skal derfor sperre direkte native logger-importer og `console`/`println` i migrert serverkode. Tillat bare navngitte oppstarts-/integrasjonsmoduler og tester. Bruk eksisterende lintregler der de finnes, ellers en avgrenset arkitekturtest; test at et ugyldig kall faktisk stoppes. Dette er en vedlikeholdsregel, ikke en sikkerhetsgrense mot bevisst omgåelse.
+
+Innfør regelen per modul og dokumenter hva som ennå ikke er migrert. Frameworklogger og eldre, uklassifiserte feil skal fortsatt være synlige i dashboardene. Ikke skru av eksisterende logger for å få et grønt kontraktresultat.
 
 ## Moderne standardoppsett
 
@@ -64,27 +92,29 @@ Kontrakten beskriver formen på loggen, ikke alle appens mulige hendelser eller 
 
 1. Oppdater til det moderne loggeroppsettet og behold eksisterende konfigurasjon for trace og redigering av sensitive felter.
 2. Legg runtimepakken til appen og teststøtten kun til testene. Bruk eksisterende loggerinstans.
-3. Flytt én egnet feilhendelse til en lokal, typed definisjon. Behold den funksjonelle oppførselen og diagnostikken.
+3. Eksporter én lokal logginngang med `createLogger`. Flytt et avgrenset områdes advarsler og feil til lokale, typed definisjoner, og håndhev inngangen i CI. Behold den funksjonelle oppførselen og diagnostikken.
 4. Test med appens encoder, reell asynkron trace-kontekst og syntetiske data. Test også en vellykket fallback eller cancellation der det er relevant.
 5. Innfør resten gradvis. Ikke endre domenefeil eller logg alle forventede utfall bare for å fylle dashboardet.
 
-Alle fire pakker er publisert som **0.1.0** i GitHub Packages. De bruker fortsatt runtime-error-kontrakt v1.0.0. Start med en pinnet pakkeversjon, og verifiser pakketilgang i appens CI før merge.
+**0.2.0** tilfører den felles logginngangen og kontekstavhengige JVM-feilkoder. `createEventLogger` og `Logger.emit` fra 0.1.0 er fortsatt tilgjengelige for gradvis innføring. JVM-konsumenter må kompileres på nytt ved oppgradering. Runtime-error-kontrakt v1.0.0 er uendret.
+
+Versjon 0.1.0 er publisert. Bruk eksemplene under etter at 0.2.0 er publisert fra `main`; en bibliotek-PR alene gjør ikke pakken tilgjengelig. Pinn pakkeversjonen, og verifiser pakketilgang i appens CI før merge.
 
 For Node/Next med eksisterende GitHub Packages-oppsett:
 
 ```sh
-pnpm add --save-exact @navikt/esyfo-logger@0.1.0
-pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.1.0
+pnpm add --save-exact @navikt/esyfo-logger@0.2.0
+pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.2.0
 ```
 
-For JVM, se [avhengigheter og registryoppsett](jvm/README.md#avhengigheter-og-verifisering). GitHub Packages krever lesetilgang også for offentlige pakker. Bruk appens vanlige registry-autentisering; biblioteket trenger ingen produksjonssecrets. Se [releaseveiledningen](.github/RELEASING.md) for senere utgivelser.
+Node-pakkene bruker appens vanlige GitHub Packages-autentisering. JVM-pakkene kan lastes ned uten credentials gjennom Navs pakkespeil: se [avhengigheter og registryoppsett](jvm/README.md#avhengigheter-og-verifisering). Biblioteket trenger ingen produksjonssecrets. Se [releaseveiledningen](.github/RELEASING.md) for publisering.
 
 ## Utvikling og verifisering
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
 pnpm rebuild esbuild --ignore-pnpmfile
-pnpm check
+pnpm run check
 cd jvm
 ./gradlew check -PtestJavaVersion=21
 ./gradlew check -PtestJavaVersion=25
@@ -98,4 +128,4 @@ Installering av NAV-testavhengighetene krever vanlig GitHub Packages-lesetilgang
 
 Bruk tokenet bare for installeringen, ikke under kjøring av tester eller andre scripts. CI lar `actions/setup-node` opprette denne brukerbaserte konfigurasjonen. [pnpm ignorerer token-plassholdere i prosjektets `.npmrc`](https://pnpm.io/npmrc#environment-variables-in-auth-settings); ikke omgå denne beskyttelsen. Ingen credentials skal sjekkes inn.
 
-`pnpm check` bygger og installerer de faktiske npm-arkivene i en separat konsument, med både ESM-, CommonJS- og typekontroll. JVM-testene bruker også publiseringsklare filer fra et lokalt Maven-repository. Releaseflyten publiserer disse verifiserte filene, uten å bygge dem på nytt. Ekte registrytilgang og appintegrasjon må i tillegg verifiseres ved første publisering og innføring.
+`pnpm run check` bygger og installerer de faktiske npm-arkivene i en separat konsument, med både ESM-, CommonJS- og typekontroll. JVM-testene bruker også publiseringsklare filer fra et lokalt Maven-repository. Releaseflyten publiserer disse verifiserte filene, uten å bygge dem på nytt. Ekte registrytilgang og appintegrasjon må i tillegg verifiseres ved første publisering og innføring.

@@ -63,6 +63,24 @@ export interface EventLogger {
   ): void;
 }
 
+export type DiagnosticValue = string | number | boolean | null | undefined;
+
+const diagnosticReservedFields = [...reservedFields, "error_code", "rejection_reason"] as const;
+type DiagnosticReservedField = (typeof diagnosticReservedFields)[number];
+const diagnosticReservedFieldSet: ReadonlySet<string> = new Set(diagnosticReservedFields);
+type AllowedDiagnosticFields<F> = AllowedContext<F> & {
+  [K in keyof F]: K extends DiagnosticReservedField ? never : DiagnosticValue;
+};
+
+export type NativeApplicationLogger = NativeLogger & {
+  debug: (fields: object, message: string) => void;
+};
+
+export interface ApplicationLogger extends EventLogger {
+  info<const F extends object>(message: string, fields?: F & AllowedDiagnosticFields<F>): void;
+  debug<const F extends object>(message: string, fields?: F & AllowedDiagnosticFields<F>): void;
+}
+
 const eventIdentity = /^[a-z][a-z0-9_.-]{0,79}$/;
 const levels: ReadonlySet<string> = new Set(["info", "warn", "error", "fatal"]);
 
@@ -116,4 +134,45 @@ export function createEventLogger(logger: NativeLogger): EventLogger {
       );
     },
   };
+}
+
+/** One application entry point, retaining the native logger's configuration. */
+export function createLogger(logger: NativeApplicationLogger): ApplicationLogger {
+  return {
+    ...createEventLogger(logger),
+    info(message, fields) {
+      assertDiagnosticMessage(message);
+      logger.info(diagnosticFields(fields), message);
+    },
+    debug(message, fields) {
+      assertDiagnosticMessage(message);
+      logger.debug(diagnosticFields(fields), message);
+    },
+  };
+}
+
+function assertDiagnosticMessage(message: string): void {
+  if (typeof message !== "string" || message.trim() === "") {
+    throw new TypeError("Diagnostic message must be a non-empty string");
+  }
+}
+
+function diagnosticFields(fields: object = {}): object {
+  const invalidFields = "Diagnostic fields must be a plain object containing only JSON primitives";
+  if (fields === null || typeof fields !== "object") throw new TypeError(invalidFields);
+  const prototype: unknown = Object.getPrototypeOf(fields);
+  if (prototype !== Object.prototype && prototype !== null) throw new TypeError(invalidFields);
+  if (Object.getOwnPropertySymbols(fields).length > 0) throw new TypeError(invalidFields);
+
+  const entries = Object.entries(fields);
+  for (const [field, value] of entries) {
+    if (diagnosticReservedFieldSet.has(field)) {
+      throw new TypeError(`Diagnostic fields must not set reserved field: ${field}`);
+    }
+    if (value !== undefined && value !== null && typeof value !== "string" && typeof value !== "boolean" &&
+      !(typeof value === "number" && Number.isFinite(value))) {
+      throw new TypeError(invalidFields);
+    }
+  }
+  return Object.fromEntries(entries.filter(([, value]) => value !== undefined));
 }
