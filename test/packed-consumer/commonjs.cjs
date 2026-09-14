@@ -1,11 +1,19 @@
 const assert = require("node:assert/strict");
 const pino = require("pino");
-const { createEventLogger, defineEvent } = require("@navikt/esyfo-logger");
+const { createEventLogger, createLogger, defineEvent } = require("@navikt/esyfo-logger");
 
 let output = "";
-const native = pino({}, { write(chunk) { output += chunk; } });
+const native = pino({ level: "debug" }, { write(chunk) { output += chunk; } });
 createEventLogger(native).event(defineEvent({
   name: "plan_fetch_failed", level: "error", message: "Kunne ikke hente oppfølgingsplan",
 }), { error_code: "NETWORK_ERROR" });
 assert.equal(JSON.parse(output).event_type, "plan_fetch_failed");
-console.log("Packed CommonJS runtime resolves and emits through native Pino");
+output = "";
+const log = createLogger(native);
+log.info("Jobben starter", { attempt: 1 });
+log.debug("Behandler neste side", { page: 2 });
+const records = output.trim().split("\n").map(JSON.parse);
+assert.equal(records[0].attempt, 1);
+assert.equal(records[1].level, 20);
+assert.equal(records[1].page, 2);
+console.log("Packed CommonJS runtime resolves the unified and existing event-only entry points");

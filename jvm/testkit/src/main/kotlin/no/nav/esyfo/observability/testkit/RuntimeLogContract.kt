@@ -16,20 +16,26 @@ public data class LogViolation(public val record: Int?, public val message: Stri
 /** Validates actual serialized runtime events. It does not decide which business outcomes to log. */
 public class RuntimeLogContract(catalog: Map<String, Set<String>>) {
     public companion object {
-        /** Derives fixed metadata from real definitions; dynamic closed values come from local enums. */
+        /** Builds a shared membership catalog, not per-event metadata relationships. Dynamic codes must be explicit. */
         public fun forEvents(
             vararg events: Event<*>,
             rejectionReasons: Set<String> = emptySet(),
             exceptionTypes: Set<String> = emptySet(),
-        ): RuntimeLogContract = RuntimeLogContract(buildMap {
-            put("event_type", events.map { it.name }.toSet())
-            val operations = events.mapNotNull { it.operation }.toSet()
-            val errorCodes = events.mapNotNull { it.errorCode }.toSet()
-            if (operations.isNotEmpty()) put("operation", operations)
-            if (errorCodes.isNotEmpty()) put("error_code", errorCodes)
-            if (rejectionReasons.isNotEmpty()) put("rejection_reason", rejectionReasons)
-            if (exceptionTypes.isNotEmpty()) put("exception_type", exceptionTypes)
-        })
+            dynamicErrorCodes: Set<String> = emptySet(),
+        ): RuntimeLogContract {
+            require(events.none { it.errorCodeFrom != null } || dynamicErrorCodes.isNotEmpty()) {
+                "Events with errorCodeFrom require an explicit non-empty dynamicErrorCodes catalog"
+            }
+            return RuntimeLogContract(buildMap {
+                put("event_type", events.map { it.name }.toSet())
+                val operations = events.mapNotNull { it.operation }.toSet()
+                val errorCodes = events.mapNotNull { it.errorCode }.toSet() + dynamicErrorCodes
+                if (operations.isNotEmpty()) put("operation", operations)
+                if (errorCodes.isNotEmpty()) put("error_code", errorCodes)
+                if (rejectionReasons.isNotEmpty()) put("rejection_reason", rejectionReasons)
+                if (exceptionTypes.isNotEmpty()) put("exception_type", exceptionTypes)
+            })
+        }
     }
 
     private val mapper = ObjectMapper(

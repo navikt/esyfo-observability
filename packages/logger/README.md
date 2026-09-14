@@ -1,18 +1,25 @@
 # @navikt/esyfo-logger
 
-Typesikre feilhendelser oppå appens eksisterende serverlogger. Biblioteket oppretter ikke en logger, transport, trace-mekanisme eller nettleser-APM.
+Én inngang til appens serverlogging, med typesikre hendelser og enkel info-/debug-diagnostikk. Biblioteket bruker appens eksisterende logger; det oppretter ingen ny logger-motor, transport, trace-mekanisme eller nettleser-APM.
 
 Bruk Node 24 LTS, TypeScript 6 og appens eksisterende Pino 10-logger. NAV-integrasjoner bruker `@navikt/pino-logger` 5.0.1 eller nyere / `@navikt/next-logger` 5.0.1 eller nyere. ESM er hovedløypen; pakken har også en CommonJS-export.
 
 ## Vanlig bruk
 
+Opprett én lokal inngang, for eksempel `src/server/log.ts`, og importer den fra appkoden:
+
+```ts
+import { logger as nativeLogger } from "@navikt/next-logger";
+import { createLogger } from "@navikt/esyfo-logger";
+
+export const log = createLogger(nativeLogger);
+```
+
 Definer hendelsen nær koden som eier feilen. Konteksttypen er den eneste lokale feltdefinisjonen; ingen egen schema- eller katalogfil er nødvendig.
 
 ```ts
-import { logger } from "@navikt/next-logger";
-import { createEventLogger, defineEvent } from "@navikt/esyfo-logger";
-
-const log = createEventLogger(logger);
+import { defineEvent } from "@navikt/esyfo-logger";
+import { log } from "@/server/log";
 
 const planHentingFeilet = defineEvent<{
   error_code: "UPSTREAM_HTTP_ERROR" | "INVALID_RESPONSE";
@@ -28,11 +35,20 @@ log.event(planHentingFeilet, {
   error_code: "UPSTREAM_HTTP_ERROR",
   upstream_status: 503,
 });
+
+log.info("Jobben starter", { attempt: 1 });
+log.debug("Behandler neste side", { page: 2, cached: false });
 ```
 
 Ukjente koder, manglende felter, feilstavede felter og ekstra felter via variabler gir typefeil. Melding, nivå og operasjon bindes én gang. Deklarerte unionsvarianter beholder sammenhengen mellom feilkode og diagnostikk.
 
-Appen velger fortsatt riktig loggpunkt og alvorlighetsnivå. Adapteren endrer ikke respons, retry, cancellation eller loggeierskap. Vanlige informasjons- og bibliotekslogger kan fortsatt bruke loggeren direkte.
+Bruk `event` for appens WARN/ERROR/FATAL og navngitte domeneutfall. Vanlig status og utviklingsdiagnostikk går gjennom `info`/`debug`. Inngangen har ingen fritekstmetoder for `warn` eller `error`, og `info`/`debug` legger ikke til `event_type`.
+
+Diagnosefeltene er et vanlig objekt med navngitte felter av typen string, endelig number, boolean eller null. `undefined` utelates før native serialisering. Objekter, arrays, funksjoner og `Error` er ikke diagnosefelt; vurdert feildiagnostikk hører til en typed hendelse. Reserverte felter som `event_type`, `error_code`, `rejection_reason`, nivå og trace avvises både av typer og ved kjøring. Primitive felter er ikke en personverngaranti: heller ikke meldinger eller strenger skal inneholde personopplysninger eller tokens.
+
+Appen velger fortsatt riktig loggpunkt og alvorlighetsnivå. Adapteren endrer ikke respons, retry, cancellation eller loggeierskap. Native logger brukes til oppsett, redigering av sensitive felter og integrasjon med rammeverk. Logger fra tredjepartsbiblioteker og nettleserens APM fortsetter uendret; de skal ikke omskrives til apphendelser. Metrikker og tracing er separate mekanismer.
+
+`createEventLogger(nativeLogger)` fra 0.1.0 fungerer fortsatt som før. `createLogger` legger til `info` og `debug` uten å endre `event`-kallene eller loggerens konfigurerte nivåfilter.
 
 ## Diagnostikk
 

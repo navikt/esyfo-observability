@@ -5,7 +5,7 @@ plugins {
 
 allprojects {
     group = "no.nav.esyfo.observability"
-    version = "0.1.0"
+    version = "0.2.0"
     repositories { mavenCentral() }
 }
 
@@ -111,6 +111,10 @@ abstract class VerifyRejectedContext @Inject constructor(
         val diagnostic = output.toString(Charsets.UTF_8)
         check(result.exitValue != 0 && "Argument type mismatch" in diagnostic && "InvalidContext.kt" in diagnostic) {
             "The wrong-context fixture must fail with a Kotlin type mismatch; compiler output:\n$diagnostic"
+        }
+        check("InvalidApplicationContext.kt" in diagnostic && "InvalidDynamicCode.kt" in diagnostic &&
+            "UnstructuredWarning.kt" in diagnostic && "Unresolved reference 'warn'" in diagnostic) {
+            "Application logging must reject wrong context, non-string codes, and unnamed warnings; compiler output:\n$diagnostic"
         }
     }
 }

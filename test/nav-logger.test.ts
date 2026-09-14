@@ -2,10 +2,10 @@ import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-ho
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { context, trace } from "@opentelemetry/api";
 import { backendLogger } from "@navikt/next-logger";
-import { createLogger } from "@navikt/pino-logger";
+import { createLogger as createNativeLogger } from "@navikt/pino-logger";
 import { afterEach, describe, expect, it } from "vitest";
-import { apiRequestRejected, createEventLogger, defineEvent } from "../packages/logger/src/index.js";
-import { assertLogEvent, createLogCapture } from "../packages/logger-testkit/src/index.js";
+import { apiRequestRejected, createEventLogger, createLogger, defineEvent } from "../packages/logger/src/index.js";
+import { assertLogEvent, createLogCapture, parseLogs } from "../packages/logger-testkit/src/index.js";
 
 const planFailed = defineEvent<{ error_code: "NETWORK_ERROR" }>({
   name: "plan_fetch_failed", level: "error", message: "Kunne ikke hente oppfølgingsplan",
@@ -13,7 +13,7 @@ const planFailed = defineEvent<{ error_code: "NETWORK_ERROR" }>({
 
 afterEach(() => { trace.disable(); context.disable(); });
 
-for (const [name, factory] of [["NAV Pino", createLogger], ["Next backendLogger", backendLogger]] as const) {
+for (const [name, factory] of [["NAV Pino", createNativeLogger], ["Next backendLogger", backendLogger]] as const) {
   describe(name, () => {
     it("preserves the native error, readable message and actual async span context", async () => {
       const manager = new AsyncLocalStorageContextManager().enable();
@@ -22,7 +22,7 @@ for (const [name, factory] of [["NAV Pino", createLogger], ["Next backendLogger"
       trace.setGlobalTracerProvider(provider);
       const capture = createLogCapture();
       const native = factory({}, capture.destination);
-      const log = createEventLogger(native);
+      const log = createLogger(native);
       let traceId = "";
       try {
         await provider.getTracer("logging-tests").startActiveSpan("fetch-plan", async (span) => {
@@ -45,7 +45,7 @@ for (const [name, factory] of [["NAV Pino", createLogger], ["Next backendLogger"
 
     it("detects sensitive data actually present in an unsanitized native cause", () => {
       const capture = createLogCapture();
-      const log = createEventLogger(factory({}, capture.destination));
+      const log = createLogger(factory({}, capture.destination));
       const sensitiveValue = "synthetic-private-token";
       log.event(planFailed, { error_code: "NETWORK_ERROR" }, new Error("Request failed", {
         cause: new Error(`Unsafe client detail: ${sensitiveValue}`),
@@ -58,7 +58,7 @@ for (const [name, factory] of [["NAV Pino", createLogger], ["Next backendLogger"
     it("retains PDL diagnostics and the existing logger's configured redaction", () => {
       const capture = createLogCapture();
       const native = factory({ redact: ["err.request.headers.authorization"] }, capture.destination);
-      const log = createEventLogger(native);
+      const log = createLogger(native);
       const response = {
         errors: [{ message: "Technical upstream error", extensions: { code: "server_error" } }],
         data: { ident: "synthetic-private-person" },
@@ -79,7 +79,7 @@ for (const [name, factory] of [["NAV Pino", createLogger], ["Next backendLogger"
 
     it("supports an app-owned final rejection without changing its response", async () => {
       const capture = createLogCapture();
-      const log = createEventLogger(factory({}, capture.destination));
+      const log = createLogger(factory({}, capture.destination));
       const rejected = apiRequestRejected<{ rejection_reason: "ACCESS_DENIED" }>({
         operation: "fetch_plan", message: "Tilgang til planen ble avvist",
       });
@@ -92,6 +92,46 @@ for (const [name, factory] of [["NAV Pino", createLogger], ["Next backendLogger"
       expect(capture.text()).toBe("");
       expect(await request(false, false)).toBe(403);
       assertLogEvent(capture.text(), { event: rejected, context: { rejection_reason: "ACCESS_DENIED" } });
+    });
+
+    it("retains the existing event-only entry point", () => {
+      const capture = createLogCapture();
+      createEventLogger(factory({}, capture.destination)).event(planFailed, { error_code: "NETWORK_ERROR" });
+      assertLogEvent(capture.text(), { event: planFailed, context: { error_code: "NETWORK_ERROR" } });
+    });
+
+    it("keeps native formatting, redaction, child bindings and async trace for ordinary diagnostics", async () => {
+      const manager = new AsyncLocalStorageContextManager().enable();
+      context.setGlobalContextManager(manager);
+      const provider = new BasicTracerProvider();
+      trace.setGlobalTracerProvider(provider);
+      const capture = createLogCapture();
+      const native = factory({ redact: ["worker"] }, capture.destination).child({ job: "plan-sync" });
+      native.level = "debug";
+      const log = createLogger(native);
+      let traceId = "";
+      try {
+        await provider.getTracer("logging-tests").startActiveSpan("sync-plan", async (span) => {
+          traceId = span.spanContext().traceId;
+          await Promise.resolve();
+          log.info("Jobben starter", { worker: "synthetic-private-worker", attempt: 1, optional: undefined });
+          log.debug("Behandler neste side", { page: 2 });
+          span.end();
+        });
+        const records = parseLogs(capture.text());
+        expect(records).toHaveLength(2);
+        expect(records[0]).toMatchObject({ message: "Jobben starter", level: "info", worker: "[Redacted]", attempt: 1 });
+        expect(records[1]).toMatchObject({ message: "Behandler neste side", level: "debug", page: 2 });
+        for (const record of records) {
+          expect(record).toMatchObject({ trace_id: traceId, job: "plan-sync" });
+          expect(record).not.toHaveProperty("event_type");
+          expect(record).not.toHaveProperty("optional");
+        }
+        expect(capture.text()).not.toContain("synthetic-private-worker");
+      } finally {
+        await provider.shutdown();
+        manager.disable();
+      }
     });
   });
 }

@@ -2,10 +2,13 @@ package no.nav.esyfo.observability.testkit
 
 import ch.qos.logback.classic.Logger
 import com.fasterxml.jackson.databind.ObjectMapper
+import no.nav.esyfo.observability.Event
 import no.nav.esyfo.observability.apiRequestRejected
+import no.nav.esyfo.observability.createLogger
 import no.nav.esyfo.observability.emit
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import org.slf4j.event.Level
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
@@ -13,6 +16,26 @@ import kotlin.test.assertTrue
 
 class RuntimeLogContractTest {
     private val lookupContract = RuntimeLogContract(mapOf("event_type" to setOf("lookup_failed")))
+    private enum class FailureCode { UPSTREAM_UNAVAILABLE, INVALID_RESPONSE }
+
+    @Test
+    fun `dynamic event codes require an explicit closed catalog and validate actual serialized values`() {
+        val event = Event<FailureCode>("plan_fetch_failed", Level.ERROR, "Could not fetch plan", errorCodeFrom = { it.name })
+        val staticEvent = Event<Unit>("other_failed", Level.ERROR, "Other operation failed", errorCode = "OTHER_FAILURE")
+        assertFailsWith<IllegalArgumentException> { RuntimeLogContract.forEvents(event) }
+        val native = LoggerFactory.getLogger("dynamic-contract-test") as Logger
+        val log = createLogger(native)
+        val capture = captureLogs(native, "JSON").also {
+            it.use {
+                FailureCode.entries.forEach { code -> log.event(event, code) }
+                log.event(staticEvent)
+            }
+        }
+        RuntimeLogContract.forEvents(event, staticEvent, dynamicErrorCodes = FailureCode.entries.map { it.name }.toSet())
+            .assertValid(capture.records, expectedCount = 3)
+        val restricted = RuntimeLogContract.forEvents(event, staticEvent, dynamicErrorCodes = setOf("UPSTREAM_UNAVAILABLE"))
+        assertEquals(listOf(LogViolation(2, "error_code is not in the application's closed catalog")), restricted.validate(capture.records))
+    }
 
     @Test
     fun `Node and JVM share exactly the same JSON shape fixtures`() {
