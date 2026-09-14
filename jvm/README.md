@@ -104,21 +104,24 @@ En syntetisk MDC-test beviser ikke at NAIS-agenten sporer hele produksjonsforlø
 
 ## Avhengigheter og verifisering
 
-Versjon 0.1.0 er publisert i GitHub Packages. Bruk appens eksisterende
-registryoppsett, med `https://maven.pkg.github.com/navikt/esyfo-observability`
-som repository for gruppen `no.nav.esyfo.observability`:
+Versjon 0.1.0 er publisert i GitHub Packages. De offentlige pakkene kan hentes
+uten credentials gjennom [Navs pakkespeil](https://github.com/navikt/github-package-registry-mirror):
 
 ```kotlin
+repositories {
+    mavenCentral()
+    maven("https://github-package-registry-mirror.gc.nav.no/cached/maven-release")
+}
+
 dependencies {
     implementation("no.nav.esyfo.observability:esyfo-logger:0.1.0")
     testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.1.0")
 }
 ```
 
-Begrens repositoryet til denne gruppen med Gradles `exclusiveContent`.
-Bruk eksisterende GitHub Packages-autentisering ved bygg, og kontroller
-`packages: read` i alle CI-jobber som løser avhengighetene, også kodeanalyse.
-Ingen registry-credentials skal sjekkes inn eller følge med appen til produksjon.
+Appens lokale bygg og CI trenger ikke registry-credentials for denne nedlastingen.
+Publisering skjer fortsatt til GitHub Packages med autentisering; speilet brukes
+bare til nedlasting.
 
 Runtime har bare Kotlin/SLF4J-avhengigheter. Testkit er en testavhengighet og bruker
 networknt/Jackson internt; ingen Jackson-typer finnes i det offentlige API-et.
