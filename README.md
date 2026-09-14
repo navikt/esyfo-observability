@@ -98,7 +98,7 @@ Kontrakten beskriver formen på loggen, ikke alle appens mulige hendelser eller 
 
 **0.2.0** tilfører den felles logginngangen og kontekstavhengige JVM-feilkoder. `createEventLogger` og `Logger.emit` fra 0.1.0 er fortsatt tilgjengelige for gradvis innføring. JVM-konsumenter må kompileres på nytt ved oppgradering. Runtime-error-kontrakt v1.0.0 er uendret.
 
-Versjon 0.1.0 er publisert. Bruk eksemplene under etter at 0.2.0 er publisert fra `main`; en bibliotek-PR alene gjør ikke pakken tilgjengelig. Pinn pakkeversjonen, og verifiser pakketilgang i appens CI før merge.
+Bruk en publisert versjon fra [utgivelsene](https://github.com/navikt/esyfo-observability/releases); en bibliotek-PR alene gjør ikke pakken tilgjengelig. Eksemplene under bruker 0.2.0. Pinn pakkeversjonen, og verifiser pakketilgang i appens CI før merge.
 
 For Node/Next med eksisterende GitHub Packages-oppsett:
 
