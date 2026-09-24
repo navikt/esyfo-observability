@@ -11,7 +11,7 @@ En felles logginngang og teststøtte for Team eSyfo. Appen beholder sin eksister
 
 ## Hva er felles, og hva eier appen?
 
-Biblioteket eier feltnavn, metadata og den lille adapteren til loggeren. Appen eier domenespråk, konkrete hendelser, feilkoder, kontekst og hvor det skal logges. En ny domenehendelse krever ingen bibliotekrelease.
+Biblioteket eier feltnavn, metadata, kontraktgyldige feilfelt og den lille adapteren til loggeren. Appen eier domenespråk, konkrete hendelser, feilkoder, kontekst, hvor det skal logges og hvordan stack håndteres. Feilfelthjelperne kopierer, erstatter eller scrubber ikke `cause`. En ny domenehendelse krever ingen bibliotekrelease.
 
 Den felles hendelsen `api_request_rejected` brukes til en faktisk API-avvisning som er relevant å følge opp. Appen velger operasjon, forklaring og tillatte årsaker. Ikke bruk den for alle 4xx, og ikke logg en avvisning dersom en fallback faktisk gir tilgang. Velg én dekkende hendelse per utfall eller forsøk; ikke logg både en generell og en domenespesifikk feil for samme utfall.
 
@@ -100,13 +100,15 @@ Kontrakten beskriver formen på loggen, ikke alle appens mulige hendelser eller 
 
 **0.2.0** tilfører den felles logginngangen og kontekstavhengige JVM-feilkoder. `createEventLogger` og `Logger.emit` fra 0.1.0 er fortsatt tilgjengelige for gradvis innføring. JVM-konsumenter må kompileres på nytt ved oppgradering. Runtime-error-kontrakt v1.0.0 er uendret.
 
-Bruk en publisert versjon fra [utgivelsene](https://github.com/navikt/esyfo-observability/releases); en bibliotek-PR alene gjør ikke pakken tilgjengelig. Eksemplene under viser 0.2.1. Kontroller at versjonen er publisert, pinn den og verifiser pakketilgang i appens CI før merge.
+**0.3.0** tilfører kontraktgyldige feilfelt (`failureFields`, `exceptionType`, `causeType`, `validUpstreamStatus`, og på JVM `sqlState` og kanselleringshjelpere). Endringen er bakoverkompatibel, og runtime-error-kontrakt v1.0.0 er uendret.
+
+Bruk en publisert versjon fra [utgivelsene](https://github.com/navikt/esyfo-observability/releases); en bibliotek-PR alene gjør ikke pakken tilgjengelig. Eksemplene under viser 0.3.0 etter publisering. Kontroller at versjonen er publisert, pinn den og verifiser pakketilgang i appens CI før merge.
 
 For Node/Next med eksisterende GitHub Packages-oppsett:
 
 ```sh
-pnpm add --save-exact @navikt/esyfo-logger@0.2.1
-pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.2.1
+pnpm add --save-exact @navikt/esyfo-logger@0.3.0
+pnpm add --save-dev --save-exact @navikt/esyfo-logger-testkit@0.3.0
 ```
 
 Node-pakkene bruker appens vanlige GitHub Packages-autentisering. JVM-pakkene kan lastes ned uten credentials gjennom Navs pakkespeil: se [avhengigheter og registryoppsett](jvm/README.md#avhengigheter-og-verifisering). Biblioteket trenger ingen produksjonssecrets. Se [releaseveiledningen](.github/RELEASING.md) for publisering.

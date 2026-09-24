@@ -5,7 +5,7 @@ plugins {
 
 allprojects {
     group = "no.nav.esyfo.observability"
-    version = "0.2.1"
+    version = "0.3.0"
     repositories { mavenCentral() }
 }
 

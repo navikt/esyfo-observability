@@ -81,6 +81,43 @@ loggfeil. Vanlige metodeargumenter evalueres fortsatt før biblioteket kalles.
 
 Bruk `Event<Unit>` og `log.event(event, cause = failure)` når hendelsen ikke har ekstra kontekst.
 
+## Feilfelt fra exception
+
+`failureFields` gir kontraktgyldige `exception_type`, `cause_type`, `sql_state`
+og `upstream_status` til en typed hendelse. Felter uten verdi utelates. Kategorien
+finnes fra exception-klassen eller en superklasse, aldri fra feilmeldingen.
+Årsakskjeden er identitetssikker og avgrenset til 16; SQL state leses kun fra
+`SQLException`. `validUpstreamStatus` tar bare HTTP-status 100–599.
+`isCancellation` og `rethrowIfCancelled` finner også innpakket kansellering eller
+avbrudd; sistnevnte gjenoppretter trådens interrupt-flagg før avbruddet kastes.
+Hele den avgrensede årsakskjeden søkes: en kansellert future innpakket i
+`ExecutionException`, eller `TimeoutCancellationException`, regnes som
+kansellering av gjeldende flyt og propageres uten terminal feillogg. Bruk
+hjelperne ved grenser der dette er ønsket; ellers sjekk den direkte typen.
+`java.sql` er en del av JDK og krever ingen ny runtime-avhengighet. Apper
+med en tilpasset jlink-runtime må inkludere `java.sql`-modulen.
+
+```kotlin
+import no.nav.esyfo.observability.failureFields
+
+data class PlanFailure(val failure: Throwable, val status: Int?, val attempt: Int)
+
+val planFailed = Event<PlanFailure>(
+    name = "plan_fetch_failed",
+    level = Level.ERROR,
+    message = "Kunne ikke hente plan",
+    fields = failureFields<PlanFailure>({ it.failure }, { it.status }) +
+        mapOf("attempt" to { context: PlanFailure -> context.attempt }),
+)
+log.event(planFailed, context, cause = context.failure)
+```
+
+Hjelperne produserer bare kontraktfelter; de scrubber, erstatter eller kopierer
+ikke `cause`. Appen eier fortsatt vurdering av om originalfeilen og dens stack
+kan logges, og må håndtere stack deretter. Ved bruk av `RuntimeLogContract` må
+appen føre de mulige kategoriene opp i `exceptionTypes`, inkludert eventuelle
+fallback-verdier. Test faktisk serialisert logg med syntetiske personverncanaries.
+
 ## Felles avvisningshendelse
 
 ```kotlin
@@ -163,8 +200,8 @@ repositories {
 }
 
 dependencies {
-    implementation("no.nav.esyfo.observability:esyfo-logger:0.2.1")
-    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.2.1")
+    implementation("no.nav.esyfo.observability:esyfo-logger:0.3.0")
+    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.3.0")
 }
 ```
 

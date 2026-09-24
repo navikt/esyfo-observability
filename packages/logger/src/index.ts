@@ -1,5 +1,7 @@
 export type Level = "info" | "warn" | "error" | "fatal";
 
+export { causeChain, causeType, exceptionType, failureFields, validUpstreamStatus } from "./failure-fields.js";
+
 export type EventDefinition = Readonly<{
   name: string;
   level: Level;
