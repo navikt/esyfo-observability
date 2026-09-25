@@ -3,6 +3,7 @@ import no.nav.esyfo.observability.Event
 import no.nav.esyfo.observability.apiRequestRejected
 import no.nav.esyfo.observability.createLogger
 import no.nav.esyfo.observability.emit
+import no.nav.esyfo.observability.failureFields
 import no.nav.esyfo.observability.testkit.RuntimeLogContract
 import no.nav.esyfo.observability.testkit.captureLogs
 import org.junit.jupiter.api.Test
@@ -87,5 +88,22 @@ class PackagedConsumerTest {
         assertEquals(65, ((bytes[6].toInt() and 255) shl 8) or (bytes[7].toInt() and 255))
         val metadata = Event::class.java.getAnnotation(Metadata::class.java).metadataVersion
         assertEquals(listOf(2, 4), metadata.take(2))
+    }
+
+    @Test
+    fun `packaged failure field readers are available to consumers`() {
+        val fields = failureFields<Throwable>({ it }, { 503 })
+        val failure = IllegalStateException("PRIVATE_packaged", IllegalArgumentException("PRIVATE_cause"))
+        assertEquals("IllegalStateException", fields.getValue("exception_type")(failure))
+        assertEquals("IllegalArgumentException", fields.getValue("cause_type")(failure))
+        assertEquals(503, fields.getValue("upstream_status")(failure))
+
+        val event = Event("plan_fetch_failed", Level.ERROR, "Could not fetch plan", fields = fields)
+        val native = LoggerFactory.getLogger("packaged-failure-fields") as Logger
+        val capture = captureLogs(native, "JSON")
+        capture.use { native.emit(event, failure) }
+        RuntimeLogContract.forEvents(event, exceptionTypes = setOf("IllegalStateException"))
+            .assertValid(capture.records, expectedCount = 1)
+        assertTrue("PRIVATE_" !in capture.records.single())
     }
 }

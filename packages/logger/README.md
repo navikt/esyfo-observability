@@ -63,6 +63,44 @@ log.event(planHentingFeilet, {
 
 Samme objekt videresendes som native `err`. Eksisterende logger bestemmer serialisering av melding, stack, cause og eventuelle egne feilfelter. Adapteren kopierer ikke feilobjektet og legger ikke til scrubbing. Gi bare feilobjekter som er vurdert som egnet for logging; noen HTTP-klienter legger request, headers eller responsdata på feilobjektet.
 
+### Kontraktfelter fra Error
+
+`failureFields(error, { upstreamStatus })` gir `exception_type`, `cause_type`
+og eventuelt `upstream_status` som et vanlig objekt. Spred feltene inn i en
+typed hendelseskontekst; det er den minste formen som passer `ExactContext`
+uten å legge `Error` i konteksten:
+
+```ts
+import { failureFields } from "@navikt/esyfo-logger";
+
+const planFailed = defineEvent<{
+  error_code: "UPSTREAM_HTTP_ERROR";
+  exception_type: string;
+  cause_type: string;
+  upstream_status?: number;
+}>({ name: "plan_fetch_failed", level: "error", message: "Kunne ikke hente plan" });
+
+log.event(planFailed, {
+  error_code: "UPSTREAM_HTTP_ERROR",
+  ...failureFields(reviewedCause, { upstreamStatus: responseStatus }),
+}, reviewedCause);
+```
+
+`causeChain`, `exceptionType`, `causeType` og `validUpstreamStatus` kan også brukes
+enkeltvis. Årsakskjeden stopper ved identitetssyklus eller 16 ledd. Ukjente
+verdier får kategorien `Error`; bare heltall fra 100 til 599 tas med som status.
+Node returnerer alltid `exception_type` og `cause_type`; en verdi som ikke er en
+`Error`, eller `undefined`, får kategorien `Error`. På JVM utelater `failureFields`
+disse feltene når årsaksleseren returnerer `null`.
+Node har ikke `sql_state` eller kanselleringshjelpere: `code` som `EPIPE` er ikke
+en standard SQL state. På JVM må brukere av `RuntimeLogContract` føre mulige
+`exception_type`-kategorier opp i `exceptionTypes`, også fallback-kategorien.
+
+Hjelperne produserer bare kontraktfelter og scrubber, erstatter eller kopierer
+ikke `cause`. Appen eier fortsatt vurdering og håndtering av stack. Dersom
+originalfeilen sendes som tredje argument, kan native logger serialisere
+meldingen og stacken; ikke send den uten en personvernvurdering.
+
 Nyttig domenediagnostikk deklareres i konteksten. Eksempelvis kan `pdl_errors` beholde den vurderte PDL-`errors[]`-diagnostikken. Dette innebærer ikke å sende PDL-data, requestvariabler eller hele klientresponsen. Appens scenariotester må bevise både nyttig forklaring og fravær av syntetiske personverncanaries i faktisk serialisert utdata.
 
 ## Felles API-avvisning

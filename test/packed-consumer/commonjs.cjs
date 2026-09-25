@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const pino = require("pino");
-const { createEventLogger, createLogger, defineEvent } = require("@navikt/esyfo-logger");
+const { createEventLogger, createLogger, defineEvent, failureFields } = require("@navikt/esyfo-logger");
 
 let output = "";
 const native = pino({ level: "debug" }, { write(chunk) { output += chunk; } });
@@ -8,6 +8,9 @@ createEventLogger(native).event(defineEvent({
   name: "plan_fetch_failed", level: "error", message: "Kunne ikke hente oppfølgingsplan",
 }), { error_code: "NETWORK_ERROR" });
 assert.equal(JSON.parse(output).event_type, "plan_fetch_failed");
+assert.deepEqual(failureFields(new TypeError("PRIVATE_packaged")), {
+  exception_type: "TypeError", cause_type: "TypeError",
+});
 output = "";
 const log = createLogger(native);
 log.info("Jobben starter", { attempt: 1 });

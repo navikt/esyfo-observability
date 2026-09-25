@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import pino from "pino";
-import { apiRequestRejected, createLogger, defineEvent } from "@navikt/esyfo-logger";
+import { apiRequestRejected, createLogger, defineEvent, failureFields } from "@navikt/esyfo-logger";
 import { assertLogEvent, createLogCapture, parseLogs } from "@navikt/esyfo-logger-testkit";
 
 const capture = createLogCapture();
@@ -17,6 +17,9 @@ assertLogEvent(capture.text(), {
   contains: ["Request failed", "Connection closed"],
 });
 assert.equal(apiRequestRejected({ operation: "hent_plan", message: "Tilgang avvist" }).level, "warn");
+assert.deepEqual(failureFields(new TypeError("PRIVATE_packaged"), { upstreamStatus: 503 }), {
+  exception_type: "TypeError", cause_type: "TypeError", upstream_status: 503,
+});
 
 const diagnostics = createLogCapture();
 const applicationLog = createLogger(pino({ level: "debug" }, diagnostics.destination));
