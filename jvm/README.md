@@ -210,7 +210,12 @@ Publisering skjer fortsatt til GitHub Packages med autentisering; speilet brukes
 bare til nedlasting.
 
 Runtime har bare Kotlin/SLF4J-avhengigheter. Testkit er en testavhengighet og bruker
-networknt/Jackson internt; ingen Jackson-typer finnes i det offentlige API-et.
+networknt og Jackson 3 internt; ingen Jackson-typer finnes i det offentlige API-et.
+Jackson 3 (`tools.jackson`) havner derfor på appens testklassesti ved siden av appens
+Jackson 2 (`com.fasterxml.jackson`). De to pakkene kolliderer ikke, men Jackson 3 deler
+`jackson-annotations` med Jackson 2 og krever 2.22 eller nyere. En app som tvinger
+`jackson-annotations` under 2.22, for eksempel via en enforced platform, kan få feil i
+egne tester.
 Logback/Logstash kommer fra appen. Testprofilen bruker Logback 1.6.3 og Logstash 9.0.
 
 ```sh

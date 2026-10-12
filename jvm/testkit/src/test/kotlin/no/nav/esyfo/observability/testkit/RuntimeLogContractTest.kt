@@ -1,7 +1,6 @@
 package no.nav.esyfo.observability.testkit
 
 import ch.qos.logback.classic.Logger
-import com.fasterxml.jackson.databind.ObjectMapper
 import no.nav.esyfo.observability.Event
 import no.nav.esyfo.observability.apiRequestRejected
 import no.nav.esyfo.observability.createLogger
@@ -9,6 +8,7 @@ import no.nav.esyfo.observability.emit
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
+import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
@@ -52,7 +52,7 @@ class RuntimeLogContractTest {
     @Test
     fun `Node and JVM share exactly the same JSON shape fixtures`() {
         val fixtures = requireNotNull(javaClass.getResourceAsStream("/contracts/runtime-error/fixtures/v1.json"))
-            .use { ObjectMapper().readTree(it) }
+            .use { JsonMapper().readTree(it) }
         val contract = RuntimeLogContract(
             mapOf(
                 "event_type" to setOf("plan_fetch_failed", "api_request_rejected", "pdl_lookup_failed", "plan_not_found"),
@@ -65,8 +65,8 @@ class RuntimeLogContractTest {
         fixtures.forEach { fixture ->
             assertEquals(
                 fixture.path("valid").asBoolean(),
-                contract.validate(listOf(fixture.path("json").asText())).isEmpty(),
-                fixture.path("name").asText(),
+                contract.validate(listOf(fixture.path("json").asString())).isEmpty(),
+                fixture.path("name").asString(),
             )
         }
     }
