@@ -200,8 +200,8 @@ repositories {
 }
 
 dependencies {
-    implementation("no.nav.esyfo.observability:esyfo-logger:0.3.0")
-    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.3.0")
+    implementation("no.nav.esyfo.observability:esyfo-logger:0.4.0")
+    testImplementation("no.nav.esyfo.observability:esyfo-logger-testkit:0.4.0")
 }
 ```
 
