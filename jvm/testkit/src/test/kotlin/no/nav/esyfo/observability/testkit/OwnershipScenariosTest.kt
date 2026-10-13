@@ -1,7 +1,6 @@
 package no.nav.esyfo.observability.testkit
 
 import ch.qos.logback.classic.Logger
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.install
@@ -25,6 +24,7 @@ import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.slf4j.event.Level
+import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -89,10 +89,10 @@ class OwnershipScenariosTest {
             runAttempt(1, false) { throw IllegalStateException("Connection temporarily unavailable") }
             runAttempt(2, true) { throw IllegalStateException("Connection still unavailable") }
         }
-        val records = capture.records.map { ObjectMapper().readTree(it) }
-        assertEquals(listOf("WARN", "ERROR"), records.map { it.path("level").asText() })
-        assertEquals(listOf("delivery_retry_scheduled", "delivery_failed"), records.map { it.path("event_type").asText() })
-        assertContains(records.last().path("stack_trace").asText(), "Connection still unavailable")
+        val records = capture.records.map { JsonMapper().readTree(it) }
+        assertEquals(listOf("WARN", "ERROR"), records.map { it.path("level").asString() })
+        assertEquals(listOf("delivery_retry_scheduled", "delivery_failed"), records.map { it.path("event_type").asString() })
+        assertContains(records.last().path("stack_trace").asString(), "Connection still unavailable")
         assertEquals(2, records.size)
     }
 
@@ -111,7 +111,7 @@ class OwnershipScenariosTest {
                 }
             }.awaitAll()
         }
-        val observed = capture.records.map { ObjectMapper().readTree(it).path("trace_id").asText() }
+        val observed = capture.records.map { JsonMapper().readTree(it).path("trace_id").asString() }
         assertEquals(traceIds.toSet(), observed.toSet())
         assertEquals(2, observed.size)
         assertNull(MDC.get("trace_id"))

@@ -1,14 +1,13 @@
 package no.nav.esyfo.observability.testkit
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.core.StreamReadFeature
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.SchemaRegistry
 import com.networknt.schema.SpecificationVersion
 import no.nav.esyfo.observability.Event
+import tools.jackson.core.JacksonException
+import tools.jackson.core.StreamReadFeature
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
 /** A validation diagnostic; serialized log content is never included in its message. */
 public data class LogViolation(public val record: Int?, public val message: String)
@@ -38,9 +37,11 @@ public class RuntimeLogContract(catalog: Map<String, Set<String>>) {
         }
     }
 
-    private val mapper = ObjectMapper(
-        JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build(),
-    ).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+    // Strict parsing is enabled explicitly rather than relying on Jackson defaults.
+    private val mapper = JsonMapper.builder()
+        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build()
     private val registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_7)
     private val schemaNode = requireNotNull(javaClass.getResourceAsStream(SCHEMA_RESOURCE)) {
         "The packaged runtime-error schema is missing"
@@ -60,7 +61,7 @@ public class RuntimeLogContract(catalog: Map<String, Set<String>>) {
                         put("type", "array")
                         put("minItems", 1)
                         put("uniqueItems", true)
-                        set<JsonNode>("items", schemaNode.path("properties").path(field))
+                        set("items", schemaNode.path("properties").path(field))
                     }
                 }
             }
@@ -80,7 +81,7 @@ public class RuntimeLogContract(catalog: Map<String, Set<String>>) {
             records.forEachIndexed { index, raw ->
                 val record = try {
                     mapper.readTree(raw)
-                } catch (_: JsonProcessingException) {
+                } catch (_: JacksonException) {
                     add(LogViolation(index + 1, "Invalid JSON, duplicate fields, or trailing content"))
                     return@forEachIndexed
                 }
@@ -93,7 +94,7 @@ public class RuntimeLogContract(catalog: Map<String, Set<String>>) {
                 }
                 if (errors.isEmpty()) {
                     CATALOG_FIELDS.filter(record::has).forEach { field ->
-                        if (record.path(field).asText() !in localCatalog[field].orEmpty()) {
+                        if (record.path(field).asString() !in localCatalog[field].orEmpty()) {
                             add(LogViolation(index + 1, "$field is not in the application's closed catalog"))
                         }
                     }

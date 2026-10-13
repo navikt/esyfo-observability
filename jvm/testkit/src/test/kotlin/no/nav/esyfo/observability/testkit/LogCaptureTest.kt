@@ -1,13 +1,13 @@
 package no.nav.esyfo.observability.testkit
 
 import ch.qos.logback.classic.Logger
-import com.fasterxml.jackson.databind.ObjectMapper
 import no.nav.esyfo.observability.Event
 import no.nav.esyfo.observability.emit
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.slf4j.event.Level
+import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,11 +32,11 @@ class LogCaptureTest {
                 cause = IllegalStateException("Connection failed before an HTTP response"),
             )
         }
-        val record = ObjectMapper().readTree(capture.records.single())
+        val record = JsonMapper().readTree(capture.records.single())
         assertFalse(record.has("upstream_status"))
-        assertEquals("Technical upstream error", record.path("pdl_errors")[0].path("message").asText())
+        assertEquals("Technical upstream error", record.path("pdl_errors")[0].path("message").asString())
         assertTrue(record.path("pdl_errors")[0].path("path").isNull)
-        assertContains(record.path("stack_trace").asText(), "Connection failed before an HTTP response")
+        assertContains(record.path("stack_trace").asString(), "Connection failed before an HTTP response")
         RuntimeLogContract.forEvents(event).assertValid(capture.records, expectedCount = 1)
     }
 
