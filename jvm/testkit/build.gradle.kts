@@ -17,8 +17,8 @@ dependencies {
     testImplementation("net.logstash.logback:logstash-logback-encoder:9.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.11.0")
-    testImplementation("io.ktor:ktor-server-test-host:3.5.2")
-    testImplementation("io.ktor:ktor-server-status-pages:3.5.2")
+    testImplementation("io.ktor:ktor-server-test-host:3.6.0")
+    testImplementation("io.ktor:ktor-server-status-pages:3.6.0")
 }
 
 tasks.processResources {
