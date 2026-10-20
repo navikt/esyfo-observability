@@ -5,29 +5,44 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "engines": { "node": ">=24" },
-  "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+  "engines": {
+    "node": ">=24"
   },
-  "files": ["dist", "contracts", "README.md", "LICENSE"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "contracts",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/navikt/esyfo-observability.git",
     "directory": "packages/logger-testkit"
   },
-  "publishConfig": { "registry": "https://npm.pkg.github.com" },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "prepare:contracts": "node scripts/prepare-contracts.mjs",
     "build": "pnpm prepare:contracts && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "pnpm prepare:contracts && vitest run"
   },
-  "dependencies": { "ajv": "8.20.0", "jsonc-parser": "3.3.1" },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "jsonc-parser": "3.3.1"
+  },
   "devDependencies": {
     "@navikt/esyfo-logger": "workspace:^",
     "@types/node": "24.13.3",
     "pino": "10.4.0",
     "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.4"
   }
 }
