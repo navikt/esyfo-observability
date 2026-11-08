@@ -8,7 +8,7 @@ base { archivesName.set("esyfo-logger-testkit") }
 dependencies {
     api(project(":logger"))
     compileOnly("ch.qos.logback:logback-classic:1.6.5")
-    implementation("com.networknt:json-schema-validator:3.0.8")
+    implementation("com.networknt:json-schema-validator:3.0.9")
     implementation("tools.jackson.core:jackson-databind:3.2.3")
     testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
