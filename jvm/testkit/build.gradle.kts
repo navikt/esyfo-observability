@@ -9,7 +9,7 @@ dependencies {
     api(project(":logger"))
     compileOnly("ch.qos.logback:logback-classic:1.6.7")
     implementation("com.networknt:json-schema-validator:3.0.9")
-    implementation("tools.jackson.core:jackson-databind:3.2.4")
+    implementation("tools.jackson.core:jackson-databind:3.3.0")
     testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
